@@ -8,12 +8,36 @@ export interface TopTrack {
   artist: string | null;
 }
 
+export interface AlbumStat {
+  key: string;
+  album: string;
+  artist: string | null;
+  hours: number;
+  plays: number;
+  uniqueTracks: number;
+  depthScore: number;
+  mostPlayedTrack: { track: string | null; hours: number; plays: number };
+  firstListen: string;
+  lastListen: string;
+  timeSeries: { date: string; hours: number }[];
+  timeOfDay: { bucket: string; hours: number }[];
+  heatmapData: { month: string; weekday: string; hours: number }[];
+}
+
+export interface ArtistAlbumCoverage {
+  artist: string;
+  totalHours: number;
+  albums: { key: string; album: string; hours: number; share: number }[];
+}
+
 export interface Analytics {
   totalHours: number;
   totalTracks: number;
   uniqueDays: number;
   avgHoursPerDay: number;
   topTracks: TopTrack[];
+  albumStats: AlbumStat[];
+  artistAlbumCoverage: ArtistAlbumCoverage[];
   platformUsage: { platform: string; hours: number }[];
   shuffleStats: { shuffled: number; notShuffled: number };
   offlineStats: { offline: number; online: number };
@@ -33,6 +57,9 @@ export interface Analytics {
 }
 
 export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
+  const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
   // Filter out records with 0 or negative play time
   const validRecords = records.filter(r => r.hours > 0);
   
@@ -120,7 +147,6 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     const current = monthMap.get(r.month) || 0;
     monthMap.set(r.month, current + r.hours);
   });
-  const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthlyHours = monthOrder
     .map(month => ({ month, hours: monthMap.get(month) || 0 }))
     .filter(m => m.hours > 0);
@@ -141,7 +167,6 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     weekdayMap.set(r.weekday, existing);
   });
   
-  const weekdayOrder = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const weekdayHours = weekdayOrder.map(weekday => {
     const data = weekdayMap.get(weekday) || { total: 0, count: 1 };
     return { weekday, hours: data.count > 0 ? data.total / data.count : 0 };
@@ -278,6 +303,140 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
       });
     });
   });
+
+  // Album analytics
+  const albumMap = new Map<string, {
+    album: string;
+    artist: string | null;
+    hours: number;
+    plays: number;
+    trackMap: Map<string, { hours: number; plays: number }>;
+    dateMap: Map<string, number>;
+    timeBucketMap: Map<string, number>;
+    heatmapMap: Map<string, number>;
+    firstListen: string;
+    lastListen: string;
+  }>();
+
+  validRecords.forEach(r => {
+    const album = r.master_metadata_album_album_name || 'Unknown Album';
+    const artist = r.master_metadata_album_artist_name || 'Unknown Artist';
+    const key = `${album}__${artist}`;
+
+    if (!albumMap.has(key)) {
+      albumMap.set(key, {
+        album,
+        artist,
+        hours: 0,
+        plays: 0,
+        trackMap: new Map(),
+        dateMap: new Map(),
+        timeBucketMap: new Map(),
+        heatmapMap: new Map(),
+        firstListen: r.date,
+        lastListen: r.date,
+      });
+    }
+
+    const entry = albumMap.get(key)!;
+    entry.hours += r.hours;
+    entry.plays += 1;
+
+    if (r.date < entry.firstListen) entry.firstListen = r.date;
+    if (r.date > entry.lastListen) entry.lastListen = r.date;
+
+    if (r.master_metadata_track_name) {
+      const trackStats = entry.trackMap.get(r.master_metadata_track_name) || { hours: 0, plays: 0 };
+      trackStats.hours += r.hours;
+      trackStats.plays += 1;
+      entry.trackMap.set(r.master_metadata_track_name, trackStats);
+    }
+
+    const currentDateHours = entry.dateMap.get(r.date) || 0;
+    entry.dateMap.set(r.date, currentDateHours + r.hours);
+
+    const currentBucketHours = entry.timeBucketMap.get(r.time_bucket) || 0;
+    entry.timeBucketMap.set(r.time_bucket, currentBucketHours + r.hours);
+
+    const heatKey = `${r.month}_${r.weekday}`;
+    const currentHeat = entry.heatmapMap.get(heatKey) || 0;
+    entry.heatmapMap.set(heatKey, currentHeat + r.hours);
+  });
+
+  const albumStats: AlbumStat[] = Array.from(albumMap.entries()).map(([key, entry]) => {
+    const mostPlayedTrackEntry = Array.from(entry.trackMap.entries())
+      .sort((a, b) => b[1].hours - a[1].hours)[0];
+    const topTrackShare = entry.hours > 0 ? (mostPlayedTrackEntry?.[1].hours || 0) / entry.hours : 0;
+
+    const timeSeries = Array.from(entry.dateMap.entries())
+      .map(([date, hours]) => ({ date, hours }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    const timeOfDay = [
+      { bucket: 'Morning (5-11)', hours: entry.timeBucketMap.get('Morning (5-11)') || 0 },
+      { bucket: 'Afternoon (12-17)', hours: entry.timeBucketMap.get('Afternoon (12-17)') || 0 },
+      { bucket: 'Evening (18-22)', hours: entry.timeBucketMap.get('Evening (18-22)') || 0 },
+      { bucket: 'Night (23-4)', hours: entry.timeBucketMap.get('Night (23-4)') || 0 },
+    ];
+
+    const heatmapDataForAlbum: { month: string; weekday: string; hours: number }[] = [];
+    monthOrder.forEach(month => {
+      weekdayOrder.forEach(weekday => {
+        const heatKey = `${month}_${weekday}`;
+        heatmapDataForAlbum.push({
+          month,
+          weekday,
+          hours: entry.heatmapMap.get(heatKey) || 0,
+        });
+      });
+    });
+
+    const uniqueTracks = entry.trackMap.size;
+    const depthScore = topTrackShare;
+
+    return {
+      key,
+      album: entry.album,
+      artist: entry.artist,
+      hours: entry.hours,
+      plays: entry.plays,
+      uniqueTracks,
+      depthScore,
+      mostPlayedTrack: {
+        track: mostPlayedTrackEntry?.[0] || null,
+        hours: mostPlayedTrackEntry?.[1].hours || 0,
+        plays: mostPlayedTrackEntry?.[1].plays || 0,
+      },
+      firstListen: entry.firstListen,
+      lastListen: entry.lastListen,
+      timeSeries,
+      timeOfDay,
+      heatmapData: heatmapDataForAlbum,
+    };
+  }).sort((a, b) => b.hours - a.hours);
+
+  const artistAlbumCoverage: ArtistAlbumCoverage[] = Array.from(
+    albumStats.reduce((acc, album) => {
+      const artistName = album.artist || 'Unknown Artist';
+      const artistEntry = acc.get(artistName) || { totalHours: 0, albums: [] as { key: string; album: string; hours: number }[] };
+      artistEntry.totalHours += album.hours;
+      artistEntry.albums.push({ key: album.key, album: album.album, hours: album.hours });
+      acc.set(artistName, artistEntry);
+      return acc;
+    }, new Map<string, { totalHours: number; albums: { key: string; album: string; hours: number }[] }>())
+  ).map(([artist, data]) => {
+    const albums = data.albums
+      .map(a => ({
+        ...a,
+        share: data.totalHours > 0 ? (a.hours / data.totalHours) * 100 : 0,
+      }))
+      .sort((a, b) => b.hours - a.hours);
+    return {
+      artist,
+      totalHours: data.totalHours,
+      albums,
+    };
+  }).sort((a, b) => b.totalHours - a.totalHours);
   
   return {
     totalHours,
@@ -285,6 +444,8 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     uniqueDays,
     avgHoursPerDay,
     topTracks,
+    albumStats,
+    artistAlbumCoverage,
     platformUsage,
     shuffleStats: { shuffled, notShuffled },
     offlineStats: { offline, online },

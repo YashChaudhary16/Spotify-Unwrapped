@@ -14,6 +14,7 @@ import TimeOfDayChart from './TimeOfDayChart';
 import SkipsReplays from './SkipsReplays';
 import MonthlyWeekdayCharts from './MonthlyWeekdayCharts';
 import ArtistAnalytics from './ArtistAnalytics';
+import AlbumAnalytics from './AlbumAnalytics';
 
 interface DashboardProps {
   data: ProcessedRecord[];
@@ -138,6 +139,12 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
 
         {/* Top Tracks */}
         <TopTracks tracks={analytics.topTracks.slice(0, topN)} />
+
+        {/* Albums */}
+        <AlbumAnalytics
+          albums={analytics.albumStats}
+          artistCoverage={analytics.artistAlbumCoverage}
+        />
 
         {/* Platform Usage */}
         <PlatformChart data={analytics.platformUsage} />
