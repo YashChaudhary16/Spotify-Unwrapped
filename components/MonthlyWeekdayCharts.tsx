@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface MonthlyWeekdayChartsProps {
@@ -16,6 +17,9 @@ export default function MonthlyWeekdayCharts({
   weekdayHours,
   heatmapData,
 }: MonthlyWeekdayChartsProps) {
+  const [activeMonthIdx, setActiveMonthIdx] = useState<number | null>(null);
+  const [activeWeekdayIdx, setActiveWeekdayIdx] = useState<number | null>(null);
+
   // Sort weekday data
   const sortedWeekdayHours = [...weekdayHours].sort(
     (a, b) => WEEKDAY_ORDER.indexOf(a.weekday) - WEEKDAY_ORDER.indexOf(b.weekday)
@@ -46,10 +50,28 @@ export default function MonthlyWeekdayCharts({
                 backgroundColor: '#282828',
                 border: '1px solid #404040',
                 borderRadius: '8px',
-                color: '#fff',
               }}
+              cursor={{ fill: 'transparent' }}
+              labelStyle={{ color: '#fff' }}
+              itemStyle={{ color: '#1DB954' }}
+              formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
             />
-            <Bar dataKey="hours" fill="#1DB954" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="hours" radius={[8, 8, 0, 0]} activeBar={false}>
+              {monthlyHours.map((entry, idx) => (
+                <Cell
+                  key={entry.month}
+                  fill={activeMonthIdx === idx ? '#1ED760' : '#1DB954'}
+                  style={{
+                    transform: activeMonthIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
+                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
+                    filter: activeMonthIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setActiveMonthIdx(idx)}
+                  onMouseLeave={() => setActiveMonthIdx(null)}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -66,10 +88,28 @@ export default function MonthlyWeekdayCharts({
                 backgroundColor: '#282828',
                 border: '1px solid #404040',
                 borderRadius: '8px',
-                color: '#fff',
               }}
+              cursor={{ fill: 'transparent' }}
+              labelStyle={{ color: '#fff' }}
+              itemStyle={{ color: '#1DB954' }}
+              formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
             />
-            <Bar dataKey="hours" fill="#1DB954" radius={[8, 8, 0, 0]} />
+            <Bar dataKey="hours" radius={[8, 8, 0, 0]} activeBar={false}>
+              {sortedWeekdayHours.map((entry, idx) => (
+                <Cell
+                  key={entry.weekday}
+                  fill={activeWeekdayIdx === idx ? '#1ED760' : '#1DB954'}
+                  style={{
+                    transform: activeWeekdayIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
+                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
+                    filter: activeWeekdayIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
+                    cursor: 'pointer',
+                  }}
+                  onMouseEnter={() => setActiveWeekdayIdx(idx)}
+                  onMouseLeave={() => setActiveWeekdayIdx(null)}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       </div>

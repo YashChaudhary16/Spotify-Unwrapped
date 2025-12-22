@@ -15,6 +15,7 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
 } from 'recharts';
 import { format, parseISO } from 'date-fns';
 
@@ -37,6 +38,7 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
 
   const [selectedAlbumKey, setSelectedAlbumKey] = useState(albums[0].key);
   const [comparisonKey, setComparisonKey] = useState(albums[1]?.key || albums[0].key);
+  const [activeSessionIdx, setActiveSessionIdx] = useState<number | null>(null);
 
   useEffect(() => {
     // Keep comparison selection valid
@@ -192,10 +194,28 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
                     backgroundColor: '#282828',
                     border: '1px solid #404040',
                     borderRadius: '8px',
-                    color: '#fff',
                   }}
+                  cursor={{ fill: 'transparent' }}
+                  labelStyle={{ color: '#fff' }}
+                  itemStyle={{ color: '#1DB954' }}
+                  formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
                 />
-                <Bar dataKey="hours" fill="#1DB954" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="hours" radius={[6, 6, 0, 0]} activeBar={false}>
+                  {selectedAlbum.timeOfDay.map((entry, idx) => (
+                    <Cell
+                      key={entry.bucket}
+                      fill={activeSessionIdx === idx ? '#1ED760' : '#1DB954'}
+                      style={{
+                        transform: activeSessionIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
+                        transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
+                        filter: activeSessionIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
+                        cursor: 'pointer',
+                      }}
+                      onMouseEnter={() => setActiveSessionIdx(idx)}
+                      onMouseLeave={() => setActiveSessionIdx(null)}
+                    />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -271,8 +291,10 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
                 backgroundColor: '#282828',
                 border: '1px solid #404040',
                 borderRadius: '8px',
-                color: '#fff',
               }}
+              cursor={{ fill: 'transparent' }}
+              labelStyle={{ color: '#fff' }}
+              itemStyle={{ color: '#1DB954' }}
               formatter={(value, name, props: any) => {
                 if (name === 'hours') return [`${(value as number).toFixed(1)} hrs`, 'Hours'];
                 if (name === 'topShare') return [`${(value as number).toFixed(1)}%`, 'Top album share'];
@@ -280,7 +302,18 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
               }}
               labelFormatter={(_label, payload) => payload?.[0]?.payload?.topAlbum || ''}
             />
-            <Bar dataKey="hours" fill="#1DB954" radius={[8, 8, 8, 8]} />
+            <Bar dataKey="hours" radius={[8, 8, 8, 8]} activeBar={false}>
+              {artistCoverage.slice(0, 8).map((artist, idx) => (
+                <Cell
+                  key={artist.artist}
+                  fill="#1DB954"
+                  style={{
+                    transform: 'translateY(0)',
+                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
+                  }}
+                />
+              ))}
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
         <div className="text-xs text-spotify-lightgray mt-2">
