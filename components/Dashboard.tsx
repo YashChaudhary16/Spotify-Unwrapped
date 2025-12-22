@@ -140,12 +140,6 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
         {/* Top Tracks */}
         <TopTracks tracks={analytics.topTracks.slice(0, topN)} />
 
-        {/* Albums */}
-        <AlbumAnalytics
-          albums={analytics.albumStats}
-          artistCoverage={analytics.artistAlbumCoverage}
-        />
-
         {/* Platform Usage */}
         <PlatformChart data={analytics.platformUsage} />
 
@@ -184,6 +178,12 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
           monthlyHours={analytics.monthlyHours}
           weekdayHours={analytics.weekdayHours}
           heatmapData={analytics.heatmapData}
+        />
+
+        {/* Albums */}
+        <AlbumAnalytics
+          albums={analytics.albumStats}
+          artistCoverage={analytics.artistAlbumCoverage}
         />
 
         {/* Artist Analytics */}
