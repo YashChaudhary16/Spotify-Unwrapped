@@ -3,8 +3,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import Dashboard from '@/components/Dashboard';
-import { RawStreamingRecord } from '@/lib/preprocessing';
-import { ProcessedRecord } from '@/lib/preprocessing';
+import { RawStreamingRecord, ProcessedRecord, preprocessStreamingHistory } from '@/lib/preprocessing';
 
 export default function Home() {
   const [processedData, setProcessedData] = useState<ProcessedRecord[] | null>(null);
@@ -34,29 +33,9 @@ export default function Home() {
         throw new Error('No records found in uploaded files');
       }
       
-      // Preprocess the data
-      const response = await fetch('/api/preprocess', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ records: allRecords }),
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to preprocess data');
-      }
-      
-      const { processed } = await response.json();
-      // Convert timestamp strings back to Date objects (JSON serialization converts Date to string)
-      const normalizedData = processed.map((record: any) => ({
-        ...record,
-        timestamp: typeof record.timestamp === 'string' 
-          ? new Date(record.timestamp) 
-          : record.timestamp,
-      }));
-      setProcessedData(normalizedData);
+      // Preprocess on client to avoid large uploads
+      const processed = preprocessStreamingHistory(allRecords);
+      setProcessedData(processed);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An error occurred');
       setProcessedData(null);
