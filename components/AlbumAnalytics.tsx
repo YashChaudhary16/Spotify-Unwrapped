@@ -34,11 +34,11 @@ const depthLabel = (depthScore: number) => {
 };
 
 export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalyticsProps) {
-  if (!albums || albums.length === 0) return null;
-
-  const [selectedAlbumKey, setSelectedAlbumKey] = useState(albums[0].key);
-  const [comparisonKey, setComparisonKey] = useState(albums[1]?.key || albums[0].key);
+  const [selectedAlbumKey, setSelectedAlbumKey] = useState(albums?.[0]?.key || '');
+  const [comparisonKey, setComparisonKey] = useState(albums?.[1]?.key || albums?.[0]?.key || '');
   const [activeSessionIdx, setActiveSessionIdx] = useState<number | null>(null);
+
+  if (!albums || albums.length === 0) return null;
 
   useEffect(() => {
     // Keep comparison selection valid
