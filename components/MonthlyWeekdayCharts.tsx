@@ -115,7 +115,10 @@ export default function MonthlyWeekdayCharts({
       </div>
 
       <div className="bg-spotify-gray/50 rounded-lg p-6">
-        <h3 className="text-xl font-semibold mb-4 text-spotify-green">Listening Hours: Month vs. Weekday</h3>
+        <h3 className="text-xl font-semibold mb-3 text-spotify-green">Listening Hours: Month vs. Weekday</h3>
+        <p className="text-sm text-spotify-lightgray mb-4">
+          Each cell is total listening hours on that weekday for that month. Brighter cells mean more hours.
+        </p>
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>

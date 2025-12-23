@@ -226,6 +226,9 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         {/* Listening density */}
         <div className="bg-spotify-dark rounded-lg p-4 border border-spotify-gray mt-6">
           <h4 className="text-lg font-semibold text-spotify-green mb-4">Listening density (month x weekday)</h4>
+          <p className="text-sm text-spotify-lightgray mb-3">
+            Each cell is total listening hours on that weekday for that month, for this album. Brighter cells mean more hours.
+          </p>
           <div className="overflow-x-auto">
             <table className="w-full border-collapse">
               <thead>
