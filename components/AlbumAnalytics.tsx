@@ -34,14 +34,14 @@ const depthLabel = (depthScore: number) => {
 };
 
 export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalyticsProps) {
-  const [selectedAlbumKey, setSelectedAlbumKey] = useState(albums?.[0]?.key || '');
-  const [comparisonKey, setComparisonKey] = useState(albums?.[1]?.key || albums?.[0]?.key || '');
+  const hasAlbums = Array.isArray(albums) && albums.length > 0;
+  const [selectedAlbumKey, setSelectedAlbumKey] = useState(hasAlbums ? albums[0].key : '');
+  const [comparisonKey, setComparisonKey] = useState(hasAlbums ? (albums[1]?.key || albums[0].key) : '');
   const [activeSessionIdx, setActiveSessionIdx] = useState<number | null>(null);
-
-  if (!albums || albums.length === 0) return null;
 
   useEffect(() => {
     // Keep comparison selection valid
+    if (!hasAlbums) return;
     if (!albums.find(a => a.key === selectedAlbumKey)) {
       setSelectedAlbumKey(albums[0].key);
     }
@@ -53,18 +53,20 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
       const alternative = albums.find(a => a.key !== selectedAlbumKey);
       if (alternative) setComparisonKey(alternative.key);
     }
-  }, [albums, selectedAlbumKey, comparisonKey]);
+  }, [albums, selectedAlbumKey, comparisonKey, hasAlbums]);
 
   const selectedAlbum = useMemo(
-    () => albums.find(a => a.key === selectedAlbumKey) || albums[0],
-    [albums, selectedAlbumKey]
+    () => (hasAlbums ? (albums.find(a => a.key === selectedAlbumKey) || albums[0]) : null),
+    [albums, selectedAlbumKey, hasAlbums]
   );
   const comparisonAlbum = useMemo(
-    () => albums.find(a => a.key === comparisonKey),
-    [albums, comparisonKey]
+    () => (hasAlbums ? albums.find(a => a.key === comparisonKey) : null),
+    [albums, comparisonKey, hasAlbums]
   );
 
-  const topAlbums = albums.slice(0, 8);
+  const topAlbums = hasAlbums ? albums.slice(0, 8) : [];
+
+  if (!hasAlbums || !selectedAlbum) return null;
 
   return (
     <div className="mb-12">
