@@ -1,148 +1,62 @@
-# Spotify Analytics Dashboard
+# Spotify Analytics
 
-A modern, privacy-focused Spotify listening analytics dashboard built with Next.js, TypeScript, and Tailwind CSS.
+A privacy-first Spotify Wrapped style dashboard built with Next.js and TypeScript.
 
-## Features
+## Live App
 
-- 📊 **Comprehensive Analytics**: View your total listening hours, top tracks, platform usage, and more
-- 🎵 **Top Tracks**: See your most-played tracks with embedded Spotify players
-- 📈 **Visualizations**: Interactive charts for time series, platform usage, time of day, and more
-- 🏆 **Streaks & Milestones**: Track your listening streaks and milestone achievements
-- 🎤 **Artist Analytics**: Deep dive into specific artist listening patterns
-- 🔒 **Privacy-First**: All data processing happens in-memory; IP addresses are automatically removed
-- 📱 **Responsive Design**: Works beautifully on desktop and mobile devices
+- https://spotify-unwrapped-nine.vercel.app/
 
-## Getting Started
+## What This App Does
 
-### Prerequisites
+- Uploads one or more `Streaming_History_Audio_*.json` files
+- Processes data in-memory (no disk storage)
+- Removes IP fields during preprocessing
+- Shows listening insights with interactive charts and tables
+- Supports year filter, top-tracks range, and artist-level analysis
 
-- Node.js 18+ and npm/yarn/pnpm
+## Main Features
 
-### Installation
+- **Core metrics:** total hours, total tracks, unique listening days, avg hours/day
+- **Track insights:** top tracks with Spotify IDs/embed support
+- **Album insights:** album ranking, depth score, top song per album, album trends
+- **Usage patterns:** platform usage, shuffle vs non-shuffle, offline vs online
+- **Time analytics:** daily series, time-of-day buckets, monthly/weekday breakdown, heatmap
+- **Behavior insights:** streaks, milestones, max listening day, first song, skips/replays
+- **Drill-downs:** artist analytics (top tracks, time-of-day, time series)
 
-1. Clone the repository:
-```bash
-git clone <your-repo-url>
-cd spotify-dashboard-nextjs
-```
+## Components
 
-2. Install dependencies:
+- `Dashboard.tsx` - orchestration, filters, and section layout
+- `Metrics.tsx` - headline stats cards
+- `TopTracks.tsx` - ranked tracks view
+- `AlbumAnalytics.tsx` - album and artist-album coverage analytics
+- `PlatformChart.tsx` - listening hours by platform
+- `ShuffleOfflineCharts.tsx` - playback behavior charts
+- `CountryMap.tsx` - listening by country
+- `TimeSeriesChart.tsx` - daily listening trend
+- `StreaksMilestones.tsx` - streak and milestone summaries
+- `TimeOfDayChart.tsx` - listening by time bucket
+- `SkipsReplays.tsx` - skipped vs replayed tracks
+- `MonthlyWeekdayCharts.tsx` - monthly/weekday charts and heatmap
+- `ArtistAnalytics.tsx` - selected artist deep dive
+
+## Core Functions
+
+- `lib/preprocessing.ts`
+  - `preprocessStreamingHistory()` - sanitizes and enriches raw Spotify records
+  - Includes timezone conversion, platform normalization, country expansion, track ID extraction, and time-bucket creation
+- `lib/analytics.ts`
+  - `calculateAnalytics()` - computes all dashboard-level metrics and chart datasets
+  - `getArtistAnalytics()` - computes artist-specific metrics and trends
+- `app/api/preprocess/route.ts`
+  - `POST` endpoint to preprocess records server-side when needed
+
+## Quick Start
+
 ```bash
 npm install
-# or
-yarn install
-# or
-pnpm install
-```
-
-3. Run the development server:
-```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
 ```
 
-4. Open [http://localhost:3000](http://localhost:3000) in your browser
-
-## How to Use
-
-1. **Get Your Spotify Data**:
-   - Go to your Spotify account settings
-   - Request your extended streaming history
-   - Download the JSON files (usually named `Streaming_History_Audio_*.json`)
-
-2. **Upload Your Data**:
-   - Drag and drop your JSON files onto the upload area
-   - Or click to select files from your computer
-   - The dashboard will automatically process and display your analytics
-
-3. **Explore Your Data**:
-   - Use the filters to select specific years
-   - Adjust the number of top tracks to display
-   - Select an artist to see detailed analytics
-   - Scroll through various visualizations and insights
-
-## Privacy & Security
-
-- **No Data Storage**: All data is processed entirely in-memory and never saved to disk
-- **IP Address Removal**: IP addresses are automatically stripped from your data during preprocessing
-- **Client-Side Processing**: Data preprocessing happens on your device or in secure API routes
-- **No Tracking**: The application does not track user behavior or collect analytics
-
-## Deployment
-
-### Deploy to Vercel
-
-1. Push your code to GitHub
-2. Import your repository in [Vercel](https://vercel.com)
-3. Vercel will automatically detect Next.js and configure the build
-4. Your dashboard will be live!
-
-### Environment Variables
-
-No environment variables are required for basic functionality.
-
-## Tech Stack
-
-- **Framework**: Next.js 14 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Charts**: Recharts
-- **Date Handling**: date-fns
-- **File Upload**: react-dropzone
-
-## Project Structure
-
-```
-spotify-dashboard-nextjs/
-├── app/
-│   ├── api/
-│   │   └── preprocess/      # API route for data preprocessing
-│   ├── globals.css           # Global styles
-│   ├── layout.tsx            # Root layout
-│   └── page.tsx              # Main page with file upload
-├── components/
-│   ├── Dashboard.tsx         # Main dashboard component
-│   ├── Metrics.tsx            # Overall statistics
-│   ├── TopTracks.tsx         # Top tracks display
-│   ├── PlatformChart.tsx     # Platform usage chart
-│   ├── ShuffleOfflineCharts.tsx
-│   ├── CountryMap.tsx
-│   ├── TimeSeriesChart.tsx
-│   ├── StreaksMilestones.tsx
-│   ├── TimeOfDayChart.tsx
-│   ├── SkipsReplays.tsx
-│   ├── MonthlyWeekdayCharts.tsx
-│   └── ArtistAnalytics.tsx
-├── lib/
-│   ├── preprocessing.ts       # Data preprocessing logic
-│   └── analytics.ts           # Analytics calculations
-└── package.json
-```
-
-## Data Preprocessing
-
-The preprocessing pipeline:
-
-1. **Sanitization**: Removes IP addresses and other sensitive data
-2. **Timezone Conversion**: Converts UTC timestamps to local time based on country
-3. **Platform Cleaning**: Normalizes platform names (Android, iOS, Windows, etc.)
-4. **Track ID Extraction**: Extracts Spotify track IDs from URIs
-5. **DateTime Features**: Extracts hour, day, month, year, weekday, etc.
-6. **Time Buckets**: Categorizes listening by time of day
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-MIT License - feel free to use this project for your own purposes.
-
-## Acknowledgments
-
-- Inspired by Spotify Wrapped
-- Built with privacy and user experience in mind
+Open `http://localhost:3000`, upload your Spotify JSON files, and explore.
 
