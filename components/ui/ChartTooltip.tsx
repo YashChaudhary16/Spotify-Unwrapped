@@ -3,8 +3,9 @@
 import { formatDuration } from '@/lib/format';
 import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
 
-interface PayloadItem {
+export interface PayloadItem {
   name?: string | number;
+  dataKey?: string | number;
   value?: number | string;
   color?: string;
   payload?: Record<string, any>;
@@ -24,6 +25,8 @@ interface ChartTooltipProps {
   nameFormatter?: (item: PayloadItem) => string;
   /** Hide the colored swatch (useful for single-series charts). */
   hideSwatch?: boolean;
+  /** Skip rows whose value is 0 (e.g. empty stacked segments). */
+  hideZero?: boolean;
 }
 
 /**
@@ -38,9 +41,11 @@ export function ChartTooltip({
   labelFormatter,
   nameFormatter,
   hideSwatch,
+  hideZero,
 }: ChartTooltipProps) {
   const { unit } = useTimeUnit();
   if (!active || !payload || payload.length === 0) return null;
+  const items = hideZero ? payload.filter(item => item.value !== 0) : payload;
 
   const row = payload[0]?.payload;
   const heading = labelFormatter ? labelFormatter(label, row) : label;
@@ -52,7 +57,7 @@ export function ChartTooltip({
         <div className="mb-1 text-xs font-medium text-spotify-lightgray">{heading}</div>
       )}
       <div className="space-y-0.5">
-        {payload.map((item, idx) => (
+        {items.map((item, idx) => (
           <div key={idx} className="flex items-center gap-2">
             {!hideSwatch && (
               <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ backgroundColor: item.color ?? item.payload?.fill }} aria-hidden />

@@ -2,32 +2,10 @@
 
 import { TIME_UNITS } from '@/lib/format';
 import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { ChipGroup } from './ChipGroup';
 
-/** Spotify-style filter chips for choosing minutes / hours / days. */
+/** Minutes / hours / days switch for every duration on the page. */
 export function TimeUnitToggle() {
   const { unit, setUnit } = useTimeUnit();
-
-  return (
-    <div role="radiogroup" aria-label="Time unit" className="flex items-center gap-1.5">
-      {TIME_UNITS.map(option => {
-        const active = option.value === unit;
-        return (
-          <button
-            key={option.value}
-            type="button"
-            role="radio"
-            aria-checked={active}
-            onClick={() => setUnit(option.value)}
-            className={`rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
-              active
-                ? 'bg-spotify-green text-black'
-                : 'bg-spotify-gray text-white hover:bg-[#333333]'
-            }`}
-          >
-            {option.label}
-          </button>
-        );
-      })}
-    </div>
-  );
+  return <ChipGroup ariaLabel="Time unit" options={TIME_UNITS} value={unit} onChange={setUnit} />;
 }

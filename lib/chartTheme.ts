@@ -44,3 +44,30 @@ export const gridPropsHorizontalBars = {
 
 /** Bar hover background: a faint band instead of Recharts' light-gray default. */
 export const barCursor = { fill: 'rgba(255, 255, 255, 0.04)' };
+
+/** Opacity of the non-hovered bars while one bar is hovered. */
+export const DIMMED_OPACITY = 0.35;
+
+/**
+ * Ordered single-hue ramp for the four time-of-day buckets (morning → night = light → deep).
+ * Every step has ≥ 3:1 contrast on the card surface.
+ */
+export const TIME_OF_DAY_COLORS: Record<string, string> = {
+  'Morning (5-11)': '#B4F5CC',
+  'Afternoon (12-17)': '#1ED760',
+  'Evening (18-22)': '#14A84A',
+  'Night (23-4)': '#0E7A36',
+};
+
+/**
+ * Album rank colors for stacked bars: top album, 2nd album, everything else.
+ * Validated (scripts/validate_palette.js, dark, #181818): CVD and normal-vision separation pass,
+ * all ≥ 3:1. A 3rd green step fails separation, so the remaining albums fold into gray.
+ */
+export const RANK_COLORS = ['#1ED760', '#0E7A36', '#7C7C7C'] as const;
+
+/** Heatmap: five green steps, dim → bright (more listening = brighter), plus a distinct empty cell. */
+export const HEAT_STEPS = ['#1B3A26', '#1D5A33', '#1C8042', '#1EAB52', '#1ED760'] as const;
+export const HEAT_EMPTY = '#242424';
+/** Text color that stays readable on each heat step. */
+export const HEAT_TEXT = ['#FFFFFF', '#FFFFFF', '#FFFFFF', '#000000', '#000000'] as const;

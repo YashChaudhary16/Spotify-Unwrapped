@@ -5,23 +5,13 @@ import {
   AlbumStat,
   ArtistAlbumCoverage,
 } from '@/lib/analytics';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  Cell,
-} from 'recharts';
+import { XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Cell } from 'recharts';
 import { Clock, Disc3, GitCompare, Grid3x3, Layers, TrendingUp, Trophy, Users } from 'lucide-react';
 import {
   CHART_COLORS,
-  barCursor,
-  gridProps,
+  DIMMED_OPACITY,
+  RANK_COLORS,
+  TIME_OF_DAY_COLORS,
   gridPropsHorizontalBars,
   xAxisProps,
   yAxisProps,
@@ -30,7 +20,10 @@ import { formatDate, formatDuration, formatDurationShort, formatNumber, formatPe
 import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
 import { Section } from '@/components/ui/Section';
 import { Card, CardTitle } from '@/components/ui/Card';
-import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { ChartTooltip, PayloadItem } from '@/components/ui/ChartTooltip';
+import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
+import { TrendChart } from '@/components/charts/TrendChart';
+import { Heatmap } from '@/components/charts/Heatmap';
 
 interface AlbumAnalyticsProps {
   albums: AlbumStat[];
@@ -54,7 +47,7 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
   const hasAlbums = Array.isArray(albums) && albums.length > 0;
   const [selectedAlbumKey, setSelectedAlbumKey] = useState(hasAlbums ? albums[0].key : '');
   const [comparisonKey, setComparisonKey] = useState(hasAlbums ? (albums[1]?.key || albums[0].key) : '');
-  const [activeSessionIdx, setActiveSessionIdx] = useState<number | null>(null);
+  const [activeArtistIdx, setActiveArtistIdx] = useState<number | null>(null);
 
   useEffect(() => {
     // Keep comparison selection valid
@@ -83,10 +76,44 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
 
   const topAlbums = hasAlbums ? albums.slice(0, 8) : [];
 
+  // Artist coverage: per artist, top album + 2nd album + everything else (stacked).
+  const coverageRows = useMemo(
+    () =>
+      artistCoverage.slice(0, 8).map(artist => {
+        const [first, second] = artist.albums;
+        const a0 = first?.hours ?? 0;
+        const a1 = second?.hours ?? 0;
+        return {
+          artist: artist.artist,
+          total: artist.totalHours,
+          a0,
+          a1,
+          rest: Math.max(artist.totalHours - a0 - a1, 0),
+          n0: first?.album ?? 'Unknown album',
+          n1: second?.album ?? '',
+          restCount: Math.max(artist.albums.length - 2, 0),
+        };
+      }),
+    [artistCoverage]
+  );
+
+  const selectedHeatmap = useMemo(() => {
+    const map = new Map<string, number>();
+    selectedAlbum?.heatmapData.forEach(h => map.set(`${h.month}|${h.weekday}`, h.hours));
+    return map;
+  }, [selectedAlbum]);
+
   if (!hasAlbums || !selectedAlbum) return null;
 
   const tickFormatter = (v: number) => formatDurationShort(v, unit);
   const durationFmt = (v: number) => formatDuration(v, unit);
+
+  const segmentName = (item: PayloadItem) => {
+    const row = item.payload ?? {};
+    if (item.dataKey === 'a0') return row.n0;
+    if (item.dataKey === 'a1') return row.n1;
+    return `${row.restCount} other album${row.restCount === 1 ? '' : 's'}`;
+  };
 
   return (
     <Section title="Albums" icon={Disc3}>
@@ -167,153 +194,113 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         {/* Momentum and session placement */}
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
           <div className={`lg:col-span-2 ${panel}`}>
-            <CardTitle icon={TrendingUp}>Album momentum</CardTitle>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart
-                data={selectedAlbum.timeSeries.map(d => ({
-                  ...d,
-                  dateFormatted: formatDate(d.date, 'MMM dd, yyyy'),
-                }))}
-              >
-                <CartesianGrid {...gridProps} />
-                <XAxis
-                  {...xAxisProps}
-                  dataKey="dateFormatted"
-                  angle={-35}
-                  textAnchor="end"
-                  height={70}
-                  interval="preserveStartEnd"
-                />
-                <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
-                <Tooltip
-                  cursor={{ stroke: CHART_COLORS.tick, strokeWidth: 1 }}
-                  content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />}
-                />
-                <Line
-                  type="monotone"
-                  dataKey="hours"
-                  stroke={CHART_COLORS.accent}
-                  strokeWidth={2}
-                  dot={{ fill: CHART_COLORS.accent, r: 3 }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <TrendChart
+              data={selectedAlbum.timeSeries}
+              height={260}
+              title={<CardTitle icon={TrendingUp} className="mb-1">Album momentum</CardTitle>}
+            />
           </div>
 
           <div className={panel}>
-            <CardTitle icon={Clock}>Session placement</CardTitle>
-            <ResponsiveContainer width="100%" height={280}>
-              <BarChart data={selectedAlbum.timeOfDay}>
-                <CartesianGrid {...gridProps} />
-                <XAxis {...xAxisProps} dataKey="bucket" tick={{ ...xAxisProps.tick, fontSize: 11 }} interval={0} />
-                <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
-                <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />} />
-                <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
-                  {selectedAlbum.timeOfDay.map((entry, idx) => (
-                    <Cell
-                      key={entry.bucket}
-                      fill={CHART_COLORS.accent}
-                      style={{
-                        transform: activeSessionIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
-                        transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
-                        filter: activeSessionIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
-                        cursor: 'pointer',
-                      }}
-                      onMouseEnter={() => setActiveSessionIdx(idx)}
-                      onMouseLeave={() => setActiveSessionIdx(null)}
-                    />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+            <CardTitle icon={Clock} subtitle="Time of day you play this album">Session placement</CardTitle>
+            <SimpleBarChart
+              data={selectedAlbum.timeOfDay}
+              categoryKey="bucket"
+              height={260}
+              colorFor={row => TIME_OF_DAY_COLORS[row.bucket] ?? CHART_COLORS.accent}
+              categoryTickFormatter={bucket => bucket.split(' ')[0]}
+            />
           </div>
         </div>
 
         {/* Listening density */}
-        {/* TODO(Step 2): scale colors against the whole grid (currently per month), add legend. */}
         <div className={`mt-4 ${panel}`}>
           <CardTitle
             icon={Grid3x3}
-            subtitle="Each cell is total listening hours on that weekday for that month, for this album. Brighter cells mean more hours."
+            subtitle="Total listening to this album on each weekday of each month. Hover a cell for the exact time."
           >
             Listening density (month × weekday)
           </CardTitle>
-          <div className="overflow-x-auto">
-            <table className="w-full border-collapse tabular-nums">
-              <thead>
-                <tr>
-                  <th className="p-2 text-left text-sm font-medium text-spotify-lightgray">Month</th>
-                  {WEEKDAY_ORDER.map(day => (
-                    <th key={day} className="p-2 text-center text-xs font-medium text-spotify-lightgray">
-                      {day.slice(0, 3)}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {MONTH_ORDER.map(month => {
-                  const row = selectedAlbum.heatmapData.filter(h => h.month === month);
-                  const maxHours = Math.max(...row.map(r => r.hours), 1);
-                  return (
-                    <tr key={month}>
-                      <td className="p-2 text-sm font-semibold">{month}</td>
-                      {WEEKDAY_ORDER.map(weekday => {
-                        const entry = row.find(r => r.weekday === weekday);
-                        const hours = entry?.hours || 0;
-                        const intensity = hours / maxHours;
-                        const bgColor = `rgba(30, 215, 96, ${Math.max(intensity, 0.1)})`;
-                        return (
-                          <td
-                            key={weekday}
-                            className="p-2 text-center text-xs"
-                            style={{ backgroundColor: bgColor }}
-                          >
-                            {hours > 0 ? hours.toFixed(1) : '-'}
-                          </td>
-                        );
-                      })}
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <Heatmap
+            rows={MONTH_ORDER}
+            cols={WEEKDAY_ORDER}
+            colLabel={day => day.slice(0, 3)}
+            value={(month, weekday) => selectedHeatmap.get(`${month}|${weekday}`) || 0}
+          />
         </div>
       </Card>
 
       {/* Artist coverage */}
       <Card className="mb-10">
-        <CardTitle icon={Users} subtitle="Which albums dominate each artist's listening time. Hover a bar to see the top album and its share.">
+        <CardTitle icon={Users} subtitle="How each top artist's listening splits across their albums">
           Artist coverage by albums
         </CardTitle>
-        <ResponsiveContainer width="100%" height={360}>
+        <ResponsiveContainer width="100%" height={coverageRows.length * 40 + 40}>
           <BarChart
-            data={artistCoverage.slice(0, 8).map(artist => ({
-              artist: artist.artist,
-              topAlbum: artist.albums[0]?.album || 'Unknown',
-              hours: artist.totalHours,
-              topShare: artist.albums[0]?.share || 0,
-            }))}
+            data={coverageRows}
             layout="vertical"
+            margin={{ top: 4, right: 16, bottom: 0, left: 0 }}
+            onMouseMove={(state: any) =>
+              setActiveArtistIdx(
+                state?.isTooltipActive && typeof state.activeTooltipIndex === 'number' ? state.activeTooltipIndex : null
+              )
+            }
+            onMouseLeave={() => setActiveArtistIdx(null)}
           >
             <CartesianGrid {...gridPropsHorizontalBars} />
             <XAxis {...xAxisProps} type="number" tickFormatter={tickFormatter} />
-            <YAxis {...yAxisProps} dataKey="artist" type="category" width={120} />
+            <YAxis
+              {...yAxisProps}
+              dataKey="artist"
+              type="category"
+              width={150}
+              interval={0}
+              tick={{ ...yAxisProps.tick, fill: '#FFFFFF', fontSize: 13 }}
+              tickFormatter={(name: string) => (name.length > 20 ? `${name.slice(0, 19)}…` : name)}
+            />
             <Tooltip
-              cursor={barCursor}
+              cursor={false}
               content={
                 <ChartTooltip
-                  hideSwatch
-                  nameFormatter={() => 'Artist total'}
-                  labelFormatter={(label, row) =>
-                    row ? `${label} · top album: ${row.topAlbum} (${formatNumber(row.topShare, 1)}%)` : label
+                  hideZero
+                  nameFormatter={segmentName}
+                  valueFormatter={(v, item) =>
+                    `${formatDuration(v, unit)} · ${formatPercent(item.payload?.total ? v / item.payload.total : 0)}`
                   }
+                  labelFormatter={(label, row) => (row ? `${label} · ${formatDuration(row.total, unit)}` : label)}
                 />
               }
             />
-            <Bar dataKey="hours" radius={[0, 4, 4, 0]} activeBar={false} fill={CHART_COLORS.accent} />
+            {(['a0', 'a1', 'rest'] as const).map((key, segment) => (
+              <Bar
+                key={key}
+                dataKey={key}
+                stackId="albums"
+                fill={RANK_COLORS[segment]}
+                stroke={CHART_COLORS.surface}
+                strokeWidth={2}
+                maxBarSize={24}
+                activeBar={false}
+              >
+                {coverageRows.map((row, idx) => (
+                  <Cell
+                    key={row.artist}
+                    fillOpacity={activeArtistIdx === null || activeArtistIdx === idx ? 1 : DIMMED_OPACITY}
+                    style={{ transition: 'fill-opacity 150ms ease' }}
+                  />
+                ))}
+              </Bar>
+            ))}
           </BarChart>
         </ResponsiveContainer>
+        <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-xs text-spotify-lightgray">
+          {['Top album', '2nd album', 'Other albums'].map((label, idx) => (
+            <span key={label} className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-sm" style={{ backgroundColor: RANK_COLORS[idx] }} aria-hidden />
+              {label}
+            </span>
+          ))}
+        </div>
       </Card>
 
       {/* Comparison */}

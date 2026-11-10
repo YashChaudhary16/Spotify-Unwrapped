@@ -151,25 +151,25 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     .map(month => ({ month, hours: monthMap.get(month) || 0 }))
     .filter(m => m.hours > 0);
   
-  // Weekday hours (average)
-  const weekdayMap = new Map<string, { total: number; count: number }>();
-  const dailyTotals = new Map<string, number>();
+  // Weekday hours: average listening per listening day (each date counted once).
+  const dailyTotals = new Map<string, { weekday: string; hours: number }>();
   validRecords.forEach(r => {
-    const current = dailyTotals.get(r.date) || 0;
-    dailyTotals.set(r.date, current + r.hours);
+    const day = dailyTotals.get(r.date) || { weekday: r.weekday, hours: 0 };
+    day.hours += r.hours;
+    dailyTotals.set(r.date, day);
   });
-  
-  records.forEach(r => {
-    const dayTotal = dailyTotals.get(r.date) || 0;
-    const existing = weekdayMap.get(r.weekday) || { total: 0, count: 0 };
-    existing.total += dayTotal;
-    existing.count += 1;
-    weekdayMap.set(r.weekday, existing);
+
+  const weekdayMap = new Map<string, { total: number; days: number }>();
+  dailyTotals.forEach(({ weekday, hours }) => {
+    const entry = weekdayMap.get(weekday) || { total: 0, days: 0 };
+    entry.total += hours;
+    entry.days += 1;
+    weekdayMap.set(weekday, entry);
   });
-  
+
   const weekdayHours = weekdayOrder.map(weekday => {
-    const data = weekdayMap.get(weekday) || { total: 0, count: 1 };
-    return { weekday, hours: data.count > 0 ? data.total / data.count : 0 };
+    const data = weekdayMap.get(weekday);
+    return { weekday, hours: data && data.days > 0 ? data.total / data.days : 0 };
   });
   
   // Streaks

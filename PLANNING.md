@@ -70,16 +70,16 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - [x] Apply all of the above across existing components (mechanical swaps, no redesigns)
 - [x] Rename the site to "Unwrapped" (header and page title); footer with the "Not affiliated with Spotify" disclaimer
 
-### Step 2 — Charts
-- [ ] Shuffle/offline → donuts with a center percentage and readable labels
-- [ ] Listening over time: Day/Week/Month toggle, data grouped to match, area line with no dots, year/month ticks without rotation (also the album momentum chart and the artist time chart)
-- [ ] Bar hover: dim the other bars (remove translateY and shadow everywhere)
-- [ ] Time of day: one green ramp in order (no near-black bar)
-- [ ] Countries: horizontal bars sorted from largest to smallest
-- [ ] Heatmaps: distinct empty cells, stepped green scale with a legend, gaps between cells, text color that contrasts with the cell
-- [ ] Album heatmap: scale colors against the whole grid, not per month
-- [ ] Chart heights fit their content; put small charts side by side
-- [ ] Artist coverage: stacked bar of each artist's album split; fix name truncation; remove the dead `topShare` code
+### Step 2 — Charts ✅ (2026-11-09; awaiting visual review)
+- [x] Shuffle/offline → donuts with a center percentage and readable labels
+- [x] Listening over time: Day/Week/Month toggle, data grouped to match, area line with no dots, year/month ticks without rotation (also the album momentum chart and the artist time chart)
+- [x] Bar hover: dim the other bars (remove translateY and shadow everywhere)
+- [x] Time of day: one green ramp in order (no near-black bar)
+- [x] Countries: horizontal bars sorted from largest to smallest (countries past the top 9 grouped into "Other (n)"); platforms horizontal too
+- [x] Heatmaps: distinct empty cells, stepped green scale with a legend, gaps between cells, text color that contrasts with the cell
+- [x] Album heatmap: scale colors against the whole grid, not per month
+- [x] Chart heights fit their content; monthly and weekday charts side by side (pairing charts *across* sections is left for the Step 3 tabs)
+- [x] Artist coverage: stacked bar (top album / 2nd album / other albums) with a legend; names truncated with "…"; dead `topShare` code removed
 
 ### Step 3 — Layout and navigation
 - [ ] Tabs: Overview · Tracks · Habits · Albums · Artist
@@ -101,6 +101,7 @@ Rules: green marks **data and active state** only, so headings are white. Number
 ### Later / ideas (not committed)
 - Milestones are computed in O(n²) over days (`lib/analytics.ts` builds the running total by re-summing a slice for each day); use a running sum
 - Weekday averages and the month × weekday heatmap sum all years together; consider normalizing by how many of each day occur
+- ~~**Bug:** `weekdayHours` was weighted by play count~~ — fixed 2026-11-09 (see Work Log).
 - Timezone map covers only IN, US and QA; other countries fall back to UTC
 - Podcast and audiobook rows (null track metadata) are counted in total time; decide how to handle them
 - `POST /api/preprocess` is unused
@@ -120,6 +121,36 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-09 — Step 2: Charts
+**Done**
+- New reusable chart components:
+  - `components/charts/SimpleBarChart.tsx`: the only bar chart, used for platforms, countries, time of day, month, weekday and album sessions. Columns or horizontal bars, colors per bar, hovering dims the other bars.
+  - `components/charts/TrendChart.tsx` + `lib/timeSeries.ts`: area chart with a Day/Week/Month toggle. Days are summed into buckets and gaps filled with 0. The default depends on the range (≤ 90 days → Day, ≤ 3 yrs → Week, longer → Month). X ticks are years, quarters, months or weeks, never rotated. Used for overall listening over time, album momentum and the artist view.
+  - `components/charts/Heatmap.tsx`: CSS-grid heatmap with 5 green steps scaled against the whole grid, a separate empty-cell color, text color chosen per step for contrast, hover outline and tooltip, and a legend (Less → More, No listening, value of the brightest cell). Used for both heatmaps; the album heatmap is no longer scaled per month.
+  - `components/ui/ChipGroup.tsx`: generic Spotify-style chip control (`TimeUnitToggle` now uses it).
+- Shuffle and offline are now donuts: green part with the % in the center, gray rest, legend with % and play counts.
+- Time of day uses an ordered green ramp (morning light → night deep); the near-black bar is gone.
+- Countries and platforms are horizontal, sorted bars; countries past the top 9 are grouped into "Other (n)".
+- Artist coverage is a stacked bar (top album / 2nd album / other albums) with a legend, tooltips naming each album with its time and share, and hover dimming.
+- `ChartTooltip` gained `hideZero` and exposes `PayloadItem.dataKey`.
+- New tokens in `lib/chartTheme.ts`: `DIMMED_OPACITY`, `TIME_OF_DAY_COLORS`, `RANK_COLORS`, `HEAT_STEPS`, `HEAT_EMPTY`, `HEAT_TEXT`.
+
+**Changed files**
+- New: `components/charts/{SimpleBarChart,TrendChart,Heatmap}.tsx`, `components/ui/ChipGroup.tsx`, `lib/timeSeries.ts`
+- Updated: `lib/analytics.ts` (weekday fix), `lib/chartTheme.ts`, `components/ui/{ChartTooltip,TimeUnitToggle}.tsx`, `components/{PlatformChart,CountryMap,TimeOfDayChart,TimeSeriesChart,ShuffleOfflineCharts,MonthlyWeekdayCharts,AlbumAnalytics}.tsx`
+
+**Notes / decisions**
+- Artist coverage has **3 segments, not 4**. The palette validator showed that no third green step can be told apart from its neighbors while keeping ≥ 3:1 contrast, so everything past the 2nd album is grouped as gray "Other albums". Rank colors `#1ED760 / #0E7A36 / #7C7C7C` pass CVD and normal-vision checks.
+- Time-of-day ramp `#B4F5CC → #1ED760 → #14A84A → #0E7A36`: every step has ≥ 3:1 contrast on `#181818`.
+- Heatmap cells show compact values in the selected unit (e.g. "12h", "720m", "0.5d").
+- The bucketing was tested on 7 years of synthetic daily data: bucket totals match, default = Month (82 points), 6 year ticks.
+- **Fixed an analytics bug in weekday averages** (`lib/analytics.ts`, `weekdayHours`). Each day's total used to be added once per *play*, which made the result an average weighted by play count and pushed weekdays with binge days too high. It now sums listening per date (track plays only) and averages over listening days per weekday, so each date counts exactly once. Checked on a worked example: Mondays with 0.1 h and 6 h → 3.05 h (the old code gave 5.88 h). Decision: average over **days you listened**, not all calendar days.
+- `tsc`, `next lint` and `next build` pass. Not checked visually in a browser yet.
+
+**Next**
+- User: review in `npm run dev`, then commit and push.
+- Step 3 — Layout and navigation (tabs, header filter bar, artist tab).
 
 ### 2026-11-09 — Step 1: Foundation
 **Done**
@@ -146,8 +177,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - Left for Step 2 on purpose, marked with `TODO(Step 2)` in code: bar lift-on-hover, time-of-day colors, daily dots on the time chart, rotated labels, heatmap scaling, donuts.
 - `npm run build` passes. Not yet checked visually in a browser (no headless browser in this environment).
 
+- Reviewed by the user, committed and pushed to `main`; Vercel deployed it automatically (pushing to `main` = production deploy).
+
 **Next**
-- User: run `npm run dev` and review the look; note anything to adjust here.
 - Step 2 — Charts.
 
 ### 2026-11-09 — Planning and Step 1 kickoff

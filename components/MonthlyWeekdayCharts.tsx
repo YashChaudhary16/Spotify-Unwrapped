@@ -1,14 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { useMemo } from 'react';
 import { CalendarDays, CalendarRange, Grid3x3, Sun } from 'lucide-react';
-import { CHART_COLORS, barCursor, gridProps, xAxisProps, yAxisProps } from '@/lib/chartTheme';
-import { formatDurationShort } from '@/lib/format';
-import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
 import { Section } from '@/components/ui/Section';
 import { Card, CardTitle } from '@/components/ui/Card';
-import { ChartTooltip } from '@/components/ui/ChartTooltip';
+import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
+import { Heatmap } from '@/components/charts/Heatmap';
 
 interface MonthlyWeekdayChartsProps {
   monthlyHours: { month: string; hours: number }[];
@@ -24,129 +21,54 @@ export default function MonthlyWeekdayCharts({
   weekdayHours,
   heatmapData,
 }: MonthlyWeekdayChartsProps) {
-  const [activeMonthIdx, setActiveMonthIdx] = useState<number | null>(null);
-  const [activeWeekdayIdx, setActiveWeekdayIdx] = useState<number | null>(null);
-  const { unit } = useTimeUnit();
-
-  // Sort weekday data
-  const sortedWeekdayHours = [...weekdayHours].sort(
-    (a, b) => WEEKDAY_ORDER.indexOf(a.weekday) - WEEKDAY_ORDER.indexOf(b.weekday)
+  const sortedWeekdayHours = useMemo(
+    () => [...weekdayHours].sort((a, b) => WEEKDAY_ORDER.indexOf(a.weekday) - WEEKDAY_ORDER.indexOf(b.weekday)),
+    [weekdayHours]
   );
 
-  // Create heatmap matrix
-  const heatmapMatrix: { [key: string]: { [key: string]: number } } = {};
-  heatmapData.forEach(({ month, weekday, hours }) => {
-    if (!heatmapMatrix[month]) heatmapMatrix[month] = {};
-    heatmapMatrix[month][weekday] = hours;
-  });
-
-  const maxHours = Math.max(...heatmapData.map(d => d.hours), 1);
-  const tickFormatter = (v: number) => formatDurationShort(v, unit);
+  const heatmapLookup = useMemo(() => {
+    const map = new Map<string, number>();
+    heatmapData.forEach(({ month, weekday, hours }) => map.set(`${month}|${weekday}`, hours));
+    return map;
+  }, [heatmapData]);
 
   return (
     <Section title="Monthly and weekday trends" icon={CalendarDays}>
-      <Card className="mb-4">
-        <CardTitle icon={CalendarRange}>Listening time per month</CardTitle>
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={monthlyHours}>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xAxisProps} dataKey="month" />
-            <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
-            <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />} />
-            <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
-              {monthlyHours.map((entry, idx) => (
-                <Cell
-                  key={entry.month}
-                  fill={CHART_COLORS.accent}
-                  style={{
-                    transform: activeMonthIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
-                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
-                    filter: activeMonthIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={() => setActiveMonthIdx(idx)}
-                  onMouseLeave={() => setActiveMonthIdx(null)}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
+      <div className="mb-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Card>
+          <CardTitle icon={CalendarRange} subtitle="All selected years combined">
+            Listening time per month
+          </CardTitle>
+          <SimpleBarChart data={monthlyHours} categoryKey="month" height={260} />
+        </Card>
 
-      <Card className="mb-4">
-        <CardTitle icon={Sun}>Average daily listening by weekday</CardTitle>
-        <ResponsiveContainer width="100%" height={400}>
-          <BarChart data={sortedWeekdayHours}>
-            <CartesianGrid {...gridProps} />
-            <XAxis {...xAxisProps} dataKey="weekday" />
-            <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
-            <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Average per day'} />} />
-            <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
-              {sortedWeekdayHours.map((entry, idx) => (
-                <Cell
-                  key={entry.weekday}
-                  fill={CHART_COLORS.accent}
-                  style={{
-                    transform: activeWeekdayIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
-                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
-                    filter: activeWeekdayIdx === idx ? 'drop-shadow(0 8px 12px rgba(0,0,0,0.25))' : 'none',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={() => setActiveWeekdayIdx(idx)}
-                  onMouseLeave={() => setActiveWeekdayIdx(null)}
-                />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </Card>
+        <Card>
+          <CardTitle icon={Sun} subtitle="Average listening on each weekday">
+            By weekday
+          </CardTitle>
+          <SimpleBarChart
+            data={sortedWeekdayHours}
+            categoryKey="weekday"
+            height={260}
+            seriesName="Average per day"
+            categoryTickFormatter={day => day.slice(0, 3)}
+          />
+        </Card>
+      </div>
 
-      {/* TODO(Step 2): stepped color scale + legend, distinct empty cells, contrast-aware text. */}
       <Card>
         <CardTitle
           icon={Grid3x3}
-          subtitle="Each cell is total listening hours on that weekday for that month. Brighter cells mean more hours."
+          subtitle="Total listening on each weekday of each month, all selected years combined. Hover a cell for the exact time."
         >
           Month vs. weekday
         </CardTitle>
-        <div className="overflow-x-auto">
-          <table className="w-full border-collapse tabular-nums">
-            <thead>
-              <tr>
-                <th className="p-2 text-left text-sm font-medium text-spotify-lightgray">Month</th>
-                {WEEKDAY_ORDER.map(day => (
-                  <th key={day} className="p-2 text-center text-sm font-medium text-spotify-lightgray">
-                    {day.slice(0, 3)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {MONTH_ORDER.map(month => {
-                const monthData = heatmapMatrix[month] || {};
-                return (
-                  <tr key={month}>
-                    <td className="p-2 text-sm font-semibold">{month}</td>
-                    {WEEKDAY_ORDER.map(weekday => {
-                      const hours = monthData[weekday] || 0;
-                      const intensity = hours / maxHours;
-                      const bgColor = `rgba(30, 215, 96, ${Math.max(intensity, 0.1)})`;
-                      return (
-                        <td
-                          key={weekday}
-                          className="p-2 text-center text-xs"
-                          style={{ backgroundColor: bgColor }}
-                        >
-                          {hours > 0 ? hours.toFixed(1) : '-'}
-                        </td>
-                      );
-                    })}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <Heatmap
+          rows={MONTH_ORDER}
+          cols={WEEKDAY_ORDER}
+          colLabel={day => day.slice(0, 3)}
+          value={(month, weekday) => heatmapLookup.get(`${month}|${weekday}`) || 0}
+        />
       </Card>
     </Section>
   );
