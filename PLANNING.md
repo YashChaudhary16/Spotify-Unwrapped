@@ -132,6 +132,61 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-10 — Artist banner: free-licensed photos from Wikimedia Commons
+**Done**
+- User feedback: the round profile photo is good, but the same photo stretched as the banner wasn't appealing. **The profile-photo banner is removed.**
+- New `lib/server/commonsBanner.ts`, called in parallel from `/api/spotify/artist` (response gains `banner`):
+  - It maps the Spotify artist ID to Wikidata through **P1902 "Spotify artist ID"**, an exact match rather than a name guess.
+  - Eligible photos (precision over coverage):
+    1. The **uncropped original of the main image (P18)**, score 100 (e.g. James Blake's headshot was cropped from a 6016×4016 concert photo).
+    2. The main image itself, score 80.
+    3. Commons photos tagged **"depicts" (P180) = this person**, score 60.
+  - File-name matching was tried and **dropped**: it picked "Hans Zimmer's Piano" and a JD Sports ad still.
+  - Filters: landscape (1.3–3:1), ≥1600px wide, JPEG/PNG/WebP, and a **free license only** (CC0 / public domain / CC BY / CC BY-SA, not NonFree). Excludes stars, posters, logos, signatures, pianos and similar. Solo shots rank above "X and Y" group shots, and concert/live photos rank slightly higher. A 1920px thumbnail is used.
+  - It sends the User-Agent Wikimedia asks for (`Unwrapped/1.0 (site URL)`), uses 5s timeouts, and is cached for a day like the rest of the route.
+- Header (`components/ArtistAnalytics.tsx`):
+  - Full-width photo at 70% opacity, tinted from the left with Spotify's dark artist color so the name sits on a calm area, plus bottom darkening.
+  - The required **credit** sits top-right ("Photo: author · license · Wikimedia Commons"), linking to the file page; the hover text notes "cropped and tinted".
+  - No eligible photo → Spotify artist-color gradient only (no photo).
+
+**Results (tested on 10 artists)**
+- Banner found: Hans Zimmer (live, CC BY 2.0), James Blake (concert, CC BY 2.0), Taylor Swift (Eras Tour), Coldplay (Wembley), Ludovico Einaudi, Daft Punk.
+- Color gradient only: Ramin Djawadi, Metro Boomin, Arijit Singh (no suitable free wide photo); Emile Mosseri (no Spotify ID on Wikidata).
+- Expect roughly half of well-known artists to get a photo; less-known artists usually won't.
+
+**Changed files**
+- New: `lib/server/commonsBanner.ts`
+- Updated: `app/api/spotify/artist/route.ts`, `lib/useSpotifyArtist.ts`, `components/ArtistAnalytics.tsx`
+
+**Notes / decisions**
+- The server now also calls Wikidata/Commons. It sends only the public Spotify artist ID, never listening data.
+- Testing gotcha: `pkill -f "next start -p …"` kills its own shell and can leave the server running (stale builds). Stop test servers by the PID found from the port instead.
+- `tsc`, `next lint` and `next build` pass; the route was tested end to end. The header still hasn't been viewed in a browser here.
+
+### 2026-11-10 — Artist page header: photo + Spotify artist colors
+**Done**
+- The Artist page header now looks like a Spotify artist page:
+  - A **round profile photo** (128px on mobile, 176px on desktop) before the name.
+  - A **banner**: the artist photo, faded in from the right (CSS mask), over a gradient in **Spotify's own artist color** (`visualIdentity.backgroundBase` → `backgroundTintedBase` → page color).
+  - A bottom darkening layer so the name and stats stay readable over any photo.
+  - Falls back to the previous green gradient and a mic icon when there's no lookup (sample data, no track IDs, or a failure).
+- New server route `app/api/spotify/artist/route.ts` (`GET ?trackId=&name=`):
+  1. It reads the track's public embed page (`open.spotify.com/embed/track/{id}`, `__NEXT_DATA__`) to get the artists, and picks the one matching the name (case- and Unicode-insensitive; otherwise the first artist).
+  2. It reads the artist's embed page to get `visualIdentity.image[]` (largest, usually 640px) and the colors.
+  - It needs a server because those embed pages don't allow browser (CORS) requests. Inputs are validated (22-character IDs only, so other URLs can't be requested), it only calls `open.spotify.com`, and responses are cached at the edge (`s-maxage` 1 day, SWR 7 days). Any failure → 404 → fallback header.
+- New client hook `lib/useSpotifyArtist.ts`: calls the route with the artist's first top track that has an ID, and caches the result per track and artist.
+
+**Changed files**
+- New: `app/api/spotify/artist/route.ts`, `lib/useSpotifyArtist.ts`
+- Updated: `components/ArtistAnalytics.tsx`
+
+**Notes / decisions**
+- **No real banner image.** Spotify's wide artist header image isn't in any public endpoint (only in its internal web-player API, which we won't scrape). The profile photo used as a faded banner plus Spotify's artist color gives a similar look.
+- **Fragile by nature:** the embed pages' `__NEXT_DATA__` format is undocumented, so if Spotify changes it, the header quietly falls back to green.
+- **Privacy change to note:** this is the first feature that sends anything to *our* server. One public track ID and the artist's name go to the Vercel function (and may appear in Vercel's request logs). No listening history is sent. The landing page's "never uploaded" wording is still accurate about the history itself; consider adding a line about artist lookups.
+- Tested on a local production server with real tracks: single-artist, a 4-artist track (picking James Blake / "metro boomin" correctly, Metro Boomin's color `rgb(153, 33, 38)`), invalid ID → 400, unknown ID → 404, cache header present. Some artists have no profile photo; Spotify returns album art for them, and we show that.
+- `tsc`, `next lint` and `next build` pass. The header itself hasn't been viewed in a browser here.
+
 ### 2026-11-10 — "First song played" preview: tried and reverted
 - Tried adding cover art and an in-card preview player to the "First song played" card. **The user reverted it**: they don't want a playable track there. The card stays a plain `StatCard`; don't suggest this again.
 
