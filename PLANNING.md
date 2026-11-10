@@ -132,6 +132,33 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-10 — "First song played" preview: tried and reverted
+- Tried adding cover art and an in-card preview player to the "First song played" card. **The user reverted it**: they don't want a playable track there. The card stays a plain `StatCard`; don't suggest this again.
+
+### 2026-11-10 — "Most listened track" card redesign
+**Done**
+- Replaced the mostly empty "Most listened track" card (Overview → Streaks and milestones) with `components/MostListenedTrack.tsx`, styled like a Spotify track page:
+  - Large cover art (640px), "Your #1 track", the track name and artist.
+  - The background is tinted with the cover's dominant color and fades into the card color.
+  - Three stats: total time, share of all listening, and top day (with that day's time).
+  - The playable Spotify player (`LazySpotifyEmbed`) along the bottom fills the space next to the milestones timeline.
+- New `lib/useSpotifyArtwork.ts`:
+  - It gets the cover from Spotify's public **oEmbed** endpoint (`open.spotify.com/oembed`, no login or API key, CORS `*`, verified) and swaps the 300px cover for the 640px one (`ab67616d00001e02` → `ab67616d0000b273`).
+  - It extracts the dominant color on a 24×24 canvas, weighted toward vivid pixels and darkened so white text stays ≥ ~7:1. The cover CDN also sends CORS `*`, so the canvas can read it.
+  - Results are cached per track. Any failure falls back quietly to no artwork.
+- `Analytics.mostListenedTrack` gained `artist`, `trackId`, `share` and `dayHours`.
+- Fallback when there's no track ID (e.g. sample data): a soft green tint and a music-note tile instead of cover art, and no player.
+
+**Changed files**
+- New: `components/MostListenedTrack.tsx`, `lib/useSpotifyArtwork.ts`
+- Updated: `lib/analytics.ts`, `components/StreaksMilestones.tsx`
+
+**Notes / decisions**
+- Privacy: the oEmbed request sends only the track ID to Spotify. The players already do that, so nothing new leaves the browser.
+- Ran the color formula on 3 real covers (outside the browser): it gives sensible tints (deep magenta for a purple cover, neutral gray for gray covers) with white-text contrast of 7.9:1 to 16:1.
+- The same hook could later give album art to Top Tracks, Albums and the Artist page.
+- `tsc`, `next lint` and `next build` pass. Not viewed in a browser here.
+
 ### 2026-11-09 — Step 5: Timezones, music-only totals, upload guard rails
 **Done**
 - **Timezones for every country.**

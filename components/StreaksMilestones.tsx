@@ -1,7 +1,9 @@
 'use client';
 
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { CalendarCheck, Flag, Flame, Music, PartyPopper, Sun, Trophy } from 'lucide-react';
+import { Flag, Flame, PartyPopper, Sun, Trophy } from 'lucide-react';
+import { Analytics } from '@/lib/analytics';
+import MostListenedTrack from './MostListenedTrack';
 import { formatDate, formatDuration, formatNumber } from '@/lib/format';
 import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
 import { Section } from '@/components/ui/Section';
@@ -13,7 +15,7 @@ interface StreaksMilestonesProps {
   maxDay: { date: string; hours: number };
   firstSong: { track: string; artist: string; date: string };
   milestones: { hours: number; date: string }[];
-  mostListenedTrack: { track: string; hours: number; date: string };
+  mostListenedTrack: Analytics['mostListenedTrack'];
 }
 
 export default function StreaksMilestones({
@@ -88,15 +90,7 @@ export default function StreaksMilestones({
           )}
         </Card>
 
-        <Card>
-          <CardTitle icon={Music}>Most listened track</CardTitle>
-          <p className="text-xl font-bold text-white">{mostListenedTrack.track}</p>
-          <p className="mt-1 tabular-nums text-spotify-lightgray">{formatDuration(mostListenedTrack.hours, unit)} total</p>
-          <p className="mt-4 flex items-center gap-2 text-sm text-spotify-lightgray">
-            <CalendarCheck className="h-4 w-4" aria-hidden />
-            Top day: {formatDate(mostListenedTrack.date)}
-          </p>
-        </Card>
+        <MostListenedTrack track={mostListenedTrack} />
       </div>
     </Section>
   );

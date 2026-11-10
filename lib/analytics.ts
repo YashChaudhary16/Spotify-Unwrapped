@@ -57,7 +57,17 @@ export interface Analytics {
   maxDay: { date: string; hours: number };
   firstSong: { track: string; artist: string; date: string };
   milestones: { hours: number; date: string }[];
-  mostListenedTrack: { track: string; hours: number; date: string };
+  mostListenedTrack: {
+    track: string;
+    artist: string | null;
+    trackId: string | null;
+    hours: number;
+    /** Share of all listening time (0–1). */
+    share: number;
+    /** Day this track was played the most, and how long that day. */
+    date: string;
+    dayHours: number;
+  };
   skippedTracks: { track: string; count: number }[];
   topPlayedTracks: { track: string; hours: number }[];
   heatmapData: { month: string; weekday: string; hours: number }[];
@@ -284,8 +294,12 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
   
   const mostListenedTrack = {
     track: mostListened.track,
+    artist: mostListened.artist,
+    trackId: mostListened.trackId,
     hours: mostListened.hours,
+    share: totalHours > 0 ? mostListened.hours / totalHours : 0,
     date: mostListenedDateEntry?.[0] || '',
+    dayHours: mostListenedDateEntry?.[1] ?? 0,
   };
   
   // Skipped tracks
