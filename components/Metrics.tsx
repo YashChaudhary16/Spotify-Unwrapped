@@ -15,7 +15,7 @@ export default function Metrics({ analytics }: MetricsProps) {
   const { unit } = useTimeUnit();
 
   return (
-    <Section title="Overview" icon={BarChart3}>
+    <Section title="At a glance" icon={BarChart3}>
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatCard icon={Clock} label="Total listening time" value={formatDuration(analytics.totalHours, unit)} />
         <StatCard icon={ListMusic} label="Tracks played" value={formatNumber(analytics.totalTracks)} />

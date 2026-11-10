@@ -81,12 +81,12 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - [x] Chart heights fit their content; monthly and weekday charts side by side (pairing charts *across* sections is left for the Step 3 tabs)
 - [x] Artist coverage: stacked bar (top album / 2nd album / other albums) with a legend; names truncated with "…"; dead `topShare` code removed
 
-### Step 3 — Layout and navigation
-- [ ] Tabs: Overview · Tracks · Habits · Albums · Artist
-- [ ] Sticky header filter bar: year chips with "All", top-N, artist search combobox, time-unit toggle
-- [ ] Artist tab (replaces the section at the bottom of the page)
-- [ ] Searchable pickers for album comparison
-- [ ] Handle "no years selected" on purpose
+### Step 3 — Layout and navigation ✅ (2026-11-09; awaiting visual review)
+- [x] Tabs: Overview · Tracks · Habits · Albums · Artist (linkable via `#hash`)
+- [x] Sticky header filter bar: year chips with "All", top-N (10/25/50, shown on Tracks and Artist), artist search combobox, time-unit toggle
+- [x] Artist tab (replaces the section at the bottom of the page): picker with search and top-12 quick picks → artist page
+- [x] Searchable pickers for album comparison
+- [x] Handle "no years selected" on purpose: an empty selection is shown as the active **All** chip
 
 ### Step 4 — Sections and landing page
 - [ ] Top tracks: lazy-loaded players, responsive width, artist name in each row
@@ -121,6 +121,41 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-09 — Step 3: Layout and navigation
+**Done**
+- **Tabs** in the sticky header: Overview · Tracks · Habits · Albums · Artist. The active tab has a green underline. The URL hash tracks the tab (`#albums` opens Albums), and switching tabs scrolls to the top.
+  - Overview: at-a-glance stats, listening over time, streaks and milestones, shuffle/offline donuts
+  - Tracks: top tracks, skips and replays
+  - Habits: time of day + platforms side by side, month/weekday charts + heatmap, countries
+  - Albums: album analytics
+  - Artist: picker → artist page
+- **Filter bar** (second header row, scrolls sideways on small screens):
+  - Years: **All** chip plus one chip per year. Several years can be selected; selecting every year (or none) falls back to All.
+  - Show: Minutes / Hours / Days.
+  - Top: 10 / 25 / 50 (only on Tracks and Artist; replaces the 5–50 slider).
+- **Artist search** in the top header row (`SearchSelect`): artists ranked by listening time in the selected years, each with its time. Picking one opens the Artist tab; × clears it.
+- **Artist tab**:
+  - With no artist chosen: `ArtistPicker` shows a search box and the top 12 artists as quick-pick cards.
+  - With an artist chosen: an artist page with a Spotify-style green gradient header (name, time · tracks · days, "Choose another artist"), 4 stat cards, top tracks, listening over time and time of day.
+  - If the chosen artist has no plays in the selected years, a notice explains why instead of showing empty charts.
+- **Album comparison** uses two searchable pickers (search by album or artist, each showing its time), labeled Album A (green) / Album B (gray) to match the comparison bars.
+- Shows "All years · 123,456 plays" (or the chosen years) above the content.
+- New `components/ui/SearchSelect.tsx`: an accessible combobox (↑/↓/Enter/Esc, click outside closes) that shows 50 rows with a "keep typing" hint. Also `chipClassName()` exported from `ChipGroup.tsx` for multi-select chips.
+- The Metrics section heading is now "At a glance", so it doesn't repeat the Overview tab name.
+
+**Changed files**
+- New: `components/ui/SearchSelect.tsx`, `components/ArtistPicker.tsx`
+- Updated: `components/Dashboard.tsx` (rewritten), `components/ArtistAnalytics.tsx` (artist page), `components/AlbumAnalytics.tsx` (searchable pickers), `components/ui/ChipGroup.tsx`, `components/Metrics.tsx`
+
+**Notes / decisions**
+- Removed the old setState-inside-`useMemo` hack for initial years; "All" is now simply `selectedYears = []`.
+- Album selection resets when you leave and come back to the Albums tab (the tab unmounts). Fine for now; could keep it in Dashboard state later.
+- `tsc`, `next lint` and `next build` pass. Not checked visually in a browser yet.
+
+**Next**
+- User: review in `npm run dev`, then commit and push.
+- Step 4 — Sections and landing page.
 
 ### 2026-11-09 — Step 2: Charts
 **Done**

@@ -24,6 +24,7 @@ import { ChartTooltip, PayloadItem } from '@/components/ui/ChartTooltip';
 import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { Heatmap } from '@/components/charts/Heatmap';
+import { SearchOption, SearchSelect } from '@/components/ui/SearchSelect';
 
 interface AlbumAnalyticsProps {
   albums: AlbumStat[];
@@ -95,6 +96,18 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         };
       }),
     [artistCoverage]
+  );
+
+  const albumOptions: SearchOption[] = useMemo(
+    () =>
+      albums.map(album => ({
+        value: album.key,
+        label: album.album,
+        sublabel: album.artist ?? undefined,
+        keywords: album.artist ?? undefined,
+        meta: formatDuration(album.hours, unit),
+      })),
+    [albums, unit]
   );
 
   const selectedHeatmap = useMemo(() => {
@@ -306,29 +319,34 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
       {/* Comparison */}
       <Card>
         <CardTitle icon={GitCompare}>Album comparison</CardTitle>
-        <div className="mb-4 flex flex-col gap-4 md:flex-row">
-          <select
-            value={selectedAlbumKey}
-            onChange={e => setSelectedAlbumKey(e.target.value)}
-            className="w-full rounded-lg border border-spotify-border bg-spotify-gray px-4 py-2 text-white focus:border-spotify-green focus:outline-none md:w-1/2"
-          >
-            {albums.map(album => (
-              <option key={album.key} value={album.key}>
-                {album.album} — {album.artist}
-              </option>
-            ))}
-          </select>
-          <select
-            value={comparisonKey}
-            onChange={e => setComparisonKey(e.target.value)}
-            className="w-full rounded-lg border border-spotify-border bg-spotify-gray px-4 py-2 text-white focus:border-spotify-green focus:outline-none md:w-1/2"
-          >
-            {albums.map(album => (
-              <option key={album.key} value={album.key}>
-                {album.album} — {album.artist}
-              </option>
-            ))}
-          </select>
+        <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div>
+            <span className="mb-1.5 flex items-center gap-2 text-xs font-medium text-spotify-lightgray">
+              <span className="h-2.5 w-2.5 rounded-sm bg-spotify-green" aria-hidden />
+              Album A
+            </span>
+            <SearchSelect
+              ariaLabel="Album A"
+              placeholder="Search albums or artists"
+              options={albumOptions}
+              value={selectedAlbumKey}
+              onChange={setSelectedAlbumKey}
+            />
+          </div>
+          <div>
+            <span className="mb-1.5 flex items-center gap-2 text-xs font-medium text-spotify-lightgray">
+              <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: CHART_COLORS.neutral }} aria-hidden />
+              Album B
+            </span>
+            <SearchSelect
+              ariaLabel="Album B"
+              placeholder="Search albums or artists"
+              options={albumOptions}
+              value={comparisonKey}
+              onChange={setComparisonKey}
+              align="right"
+            />
+          </div>
         </div>
 
         {comparisonAlbum && (
