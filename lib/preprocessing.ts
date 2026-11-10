@@ -1,22 +1,65 @@
-import { format, parseISO, getHours, getMinutes, getSeconds, getMonth, getYear } from 'date-fns';
+import { format, isValid, parseISO, getHours, getMinutes, getSeconds, getMonth, getYear } from 'date-fns';
 import { utcToZonedTime } from 'date-fns-tz';
 // @ts-ignore - world-countries has type resolution issues with Next.js
 import countries from 'world-countries';
+import { COUNTRY_TIMEZONES } from './countryTimezones';
 
-// Country code to full name mapping
-const getCountryName = (code: string | null): string | null => {
-  if (!code) return null;
+// Country code -> full name, built once (was a linear search per record).
+const COUNTRY_NAMES = new Map<string, string>(
   // @ts-ignore - world-countries type resolution
-  const country = countries.find((c: any) => c.cca2 === code);
-  return country ? country.name.common : null;
+  (countries as any[]).map(c => [c.cca2, c.name.common])
+);
+const getCountryName = (code: string | null): string | null => (code ? COUNTRY_NAMES.get(code) ?? null : null);
+
+/** Spotify reports "ZZ" (or nothing) when it couldn't tell the country. */
+const knownCountry = (code: string | null | undefined): string | null =>
+  code && code !== 'ZZ' && COUNTRY_TIMEZONES[code] ? code : null;
+
+// Older browsers may not know newer IANA names; fall back to their long-standing aliases.
+const TZ_ALIASES: Record<string, string> = {
+  'Europe/Kyiv': 'Europe/Kiev',
+  'America/Nuuk': 'America/Godthab',
+  'Pacific/Kanton': 'Pacific/Enderbury',
+};
+const tzSupport = new Map<string, string>();
+/** Returns a timezone this runtime can use: the zone itself, its alias, or UTC. */
+const usableTimezone = (zone: string): string => {
+  const cached = tzSupport.get(zone);
+  if (cached) return cached;
+  let result = 'UTC';
+  for (const candidate of [zone, TZ_ALIASES[zone]]) {
+    if (!candidate) continue;
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: candidate });
+      result = candidate;
+      break;
+    } catch {
+      /* try the next candidate */
+    }
+  }
+  tzSupport.set(zone, result);
+  return result;
 };
 
-// Timezone mapping
-const TZ_MAP: Record<string, string> = {
-  'IN': 'Asia/Kolkata',
-  'US': 'America/New_York',
-  'QA': 'Asia/Qatar',
+/** The viewer's own timezone, used only when no play in the whole upload has a country. */
+const browserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  } catch {
+    return 'UTC';
+  }
 };
+
+/** Podcast episodes and audiobook chapters aren't counted (yet) — only music. */
+export const isPodcastOrAudiobook = (r: RawStreamingRecord): boolean =>
+  Boolean(
+    r.spotify_episode_uri ||
+      r.episode_name ||
+      r.episode_show_name ||
+      r.audiobook_uri ||
+      r.audiobook_chapter_uri ||
+      r.audiobook_title
+  );
 
 // Platform cleaning regex patterns
 const PLATFORM_REGEX: Record<string, RegExp> = {
@@ -63,6 +106,13 @@ export interface RawStreamingRecord {
   master_metadata_album_artist_name?: string | null;
   master_metadata_album_album_name?: string | null;
   spotify_track_uri?: string | null;
+  episode_name?: string | null;
+  episode_show_name?: string | null;
+  spotify_episode_uri?: string | null;
+  audiobook_title?: string | null;
+  audiobook_uri?: string | null;
+  audiobook_chapter_uri?: string | null;
+  audiobook_chapter_title?: string | null;
   reason_start?: string;
   reason_end?: string;
   shuffle?: boolean;
@@ -106,29 +156,83 @@ export interface ProcessedRecord {
   weekday: string;
 }
 
-export const preprocessStreamingHistory = (records: RawStreamingRecord[]): ProcessedRecord[] => {
-  const cutoff = new Date('2024-08-04T00:00:00Z');
-  
-  // Remove IP addresses for privacy
-  const sanitizedRecords = records.map(({ ip_addr, ip_addr_decrypted, ...rest }) => rest);
-  
-  const processed: ProcessedRecord[] = [];
-  
-  for (const record of sanitizedRecords) {
-    // Parse UTC timestamp
-    const tsUtc = parseISO(record.ts);
-    
-    // Determine timezone based on country
-    let timezone = 'UTC';
-    const country = record.conn_country;
-    
-    if (country && TZ_MAP[country]) {
-      timezone = TZ_MAP[country];
-    } else if (!country) {
-      // Fallback: US after cutoff, India before
-      timezone = tsUtc >= cutoff ? 'America/New_York' : 'Asia/Kolkata';
+/** What was left out while preprocessing, so the UI can be upfront about it. */
+export interface PreprocessReport {
+  /** Podcast episode and audiobook plays (not counted yet). */
+  podcastPlays: number;
+  /** Rows without a usable timestamp. */
+  invalidRecords: number;
+  /** Exact duplicate plays (e.g. the same file uploaded twice). */
+  duplicates: number;
+}
+
+/** Finds, for each timestamp, the country of the nearest play (in time) that reported one. */
+const nearestCountryLookup = (known: { t: number; country: string }[]) => {
+  known.sort((a, b) => a.t - b.t);
+  return (t: number): string | null => {
+    if (known.length === 0) return null;
+    let lo = 0;
+    let hi = known.length - 1;
+    while (lo < hi) {
+      const mid = (lo + hi) >> 1;
+      if (known[mid].t < t) lo = mid + 1;
+      else hi = mid;
     }
-    
+    const after = known[lo];
+    const before = known[lo - 1];
+    if (!before) return after.country;
+    return Math.abs(after.t - t) < Math.abs(t - before.t) ? after.country : before.country;
+  };
+};
+
+export const preprocessStreamingHistory = (records: RawStreamingRecord[]): ProcessedRecord[] =>
+  preprocessWithReport(records).records;
+
+export const preprocessWithReport = (
+  records: RawStreamingRecord[]
+): { records: ProcessedRecord[]; report: PreprocessReport } => {
+  const report: PreprocessReport = { podcastPlays: 0, invalidRecords: 0, duplicates: 0 };
+
+  // 1. Keep valid, unique music plays. IP addresses are dropped here for privacy.
+  const seen = new Set<string>();
+  const music: { record: RawStreamingRecord; tsUtc: Date }[] = [];
+  for (const { ip_addr, ip_addr_decrypted, ...record } of records) {
+    if (!record || typeof record.ts !== 'string') {
+      report.invalidRecords++;
+      continue;
+    }
+    const tsUtc = parseISO(record.ts);
+    if (!isValid(tsUtc)) {
+      report.invalidRecords++;
+      continue;
+    }
+    if (isPodcastOrAudiobook(record)) {
+      report.podcastPlays++;
+      continue;
+    }
+    const key = `${record.ts}|${record.spotify_track_uri ?? record.master_metadata_track_name ?? ''}|${record.ms_played}|${record.platform ?? ''}`;
+    if (seen.has(key)) {
+      report.duplicates++;
+      continue;
+    }
+    seen.add(key);
+    music.push({ record, tsUtc });
+  }
+
+  // 2. Plays without a country borrow the country of the nearest play that has one.
+  const nearestCountry = nearestCountryLookup(
+    music
+      .filter(m => knownCountry(m.record.conn_country))
+      .map(m => ({ t: m.tsUtc.getTime(), country: m.record.conn_country as string }))
+  );
+  const fallbackTimezone = usableTimezone(browserTimezone());
+
+  const processed: ProcessedRecord[] = [];
+
+  for (const { record, tsUtc } of music) {
+    const country = knownCountry(record.conn_country) ?? nearestCountry(tsUtc.getTime());
+    const timezone = country ? usableTimezone(COUNTRY_TIMEZONES[country]) : fallbackTimezone;
+
     // Convert to local time
     const tsLocal = utcToZonedTime(tsUtc, timezone);
     
@@ -145,14 +249,15 @@ export const preprocessStreamingHistory = (records: RawStreamingRecord[]): Proce
     const monthShort = format(tsLocal, 'MMM');
     
     // Calculate listening time
-    const msPlayed = record.ms_played || 0;
+    const msPlayed = Number.isFinite(record.ms_played) && record.ms_played > 0 ? record.ms_played : 0;
     const hours = msPlayed / (1000 * 60 * 60);
     const minutes = msPlayed / (1000 * 60);
     
     // Process record
     const processedRecord: ProcessedRecord = {
       ms_played: msPlayed,
-      conn_country_full: getCountryName(country || null),
+      // The country chart shows only what Spotify reported; the borrowed country is used just for the timezone.
+      conn_country_full: getCountryName(knownCountry(record.conn_country)),
       master_metadata_track_name: record.master_metadata_track_name || null,
       master_metadata_album_artist_name: record.master_metadata_album_artist_name || null,
       master_metadata_album_album_name: record.master_metadata_album_album_name || null,
@@ -186,7 +291,7 @@ export const preprocessStreamingHistory = (records: RawStreamingRecord[]): Proce
     
     processed.push(processedRecord);
   }
-  
-  return processed;
+
+  return { records: processed, report };
 };
 

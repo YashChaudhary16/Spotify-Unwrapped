@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Disc3, LayoutDashboard, ListMusic, MicVocal, ShieldCheck, Sun, Upload, type LucideIcon } from 'lucide-react';
 import { ProcessedRecord } from '@/lib/preprocessing';
+import { ImportResult } from '@/lib/parseFiles';
+import { ImportNotice } from '@/components/ImportNotice';
 import { calculateAnalytics, getArtistAnalytics } from '@/lib/analytics';
 import { formatDuration, formatNumber } from '@/lib/format';
 import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
@@ -29,6 +31,8 @@ interface DashboardProps {
   onReset: () => void;
   /** True when showing the generated demo history instead of the user's own files. */
   isSample?: boolean;
+  /** What the importer left out (skipped files, podcasts, duplicates). */
+  importSummary?: Omit<ImportResult, 'records'> | null;
 }
 
 type TabId = 'overview' | 'tracks' | 'habits' | 'albums' | 'artist';
@@ -49,7 +53,7 @@ const TOP_N_OPTIONS = [
   { value: '50', label: '50' },
 ];
 
-export default function Dashboard({ data, onReset, isSample = false }: DashboardProps) {
+export default function Dashboard({ data, onReset, isSample = false, importSummary = null }: DashboardProps) {
   const { unit } = useTimeUnit();
   const [tab, setTab] = useState<TabId>('overview');
   /** Selected years; an empty list means "All years". */
@@ -91,6 +95,8 @@ export default function Dashboard({ data, onReset, isSample = false }: Dashboard
   );
 
   const analytics = useMemo(() => calculateAnalytics(filteredData), [filteredData]);
+  /** False when the selected years only contain empty/0-second plays — nothing meaningful to chart. */
+  const hasListening = analytics.totalTracks > 0 && analytics.topTracks.length > 0;
 
   // Artists ranked by listening time in the selected years.
   const artistHours = useMemo(() => {
@@ -237,11 +243,29 @@ export default function Dashboard({ data, onReset, isSample = false }: Dashboard
           </div>
         )}
 
+        {importSummary && <ImportNotice summary={importSummary} />}
+
         <p className="mb-8 text-sm text-spotify-lightgray">
           <span className="font-semibold text-white">{yearSummary}</span> · {formatNumber(filteredData.length)} plays
         </p>
 
-        {tab === 'overview' && (
+        {!hasListening && (
+          <div className="mb-12 rounded-xl border border-spotify-border bg-spotify-dark p-8 text-center">
+            <p className="text-lg font-semibold text-white">No listening in {yearSummary.toLowerCase()}</p>
+            <p className="mt-1 text-sm text-spotify-lightgray">
+              Every play in this range is empty or 0 seconds long. Pick other years above.
+            </p>
+            <button
+              type="button"
+              onClick={() => setSelectedYears([])}
+              className="mt-4 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black"
+            >
+              Show all years
+            </button>
+          </div>
+        )}
+
+        {hasListening && tab === 'overview' && (
           <>
             <Metrics analytics={analytics} />
             <TimeSeriesChart data={analytics.timeSeries} />
@@ -256,14 +280,14 @@ export default function Dashboard({ data, onReset, isSample = false }: Dashboard
           </>
         )}
 
-        {tab === 'tracks' && (
+        {hasListening && tab === 'tracks' && (
           <>
             <TopTracks tracks={analytics.topTracks.slice(0, Number(topN))} />
             <SkipsReplays skippedTracks={analytics.skippedTracks} topPlayedTracks={analytics.topPlayedTracks} />
           </>
         )}
 
-        {tab === 'habits' && (
+        {hasListening && tab === 'habits' && (
           <>
             <div className="grid grid-cols-1 gap-x-4 lg:grid-cols-2">
               <TimeOfDayChart data={analytics.timeOfDay} />
@@ -278,11 +302,11 @@ export default function Dashboard({ data, onReset, isSample = false }: Dashboard
           </>
         )}
 
-        {tab === 'albums' && (
+        {hasListening && tab === 'albums' && (
           <AlbumAnalytics albums={analytics.albumStats} artistCoverage={analytics.artistAlbumCoverage} />
         )}
 
-        {tab === 'artist' &&
+        {hasListening && tab === 'artist' &&
           (selectedArtist && artistAnalytics ? (
             <ArtistAnalytics
               artistName={selectedArtist}

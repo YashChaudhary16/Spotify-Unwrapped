@@ -7,18 +7,19 @@ import Dashboard from '@/components/Dashboard';
 import { Brand } from '@/components/ui/Brand';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { ProcessedRecord, preprocessStreamingHistory } from '@/lib/preprocessing';
-import { ParseProgress, parseStreamingFiles } from '@/lib/parseFiles';
+import { ImportResult, ParseProgress, SkippedFile, parseStreamingFiles } from '@/lib/parseFiles';
 import { formatNumber } from '@/lib/format';
 
 const SPOTIFY_PRIVACY_URL = 'https://www.spotify.com/account/privacy/';
 
 type WorkerMessage =
   | { type: 'progress'; progress: ParseProgress }
-  | { type: 'done'; records: ProcessedRecord[] }
+  | { type: 'done'; result: ImportResult }
   | { type: 'error'; message: string };
 
 export default function Home() {
   const [processedData, setProcessedData] = useState<ProcessedRecord[] | null>(null);
+  const [importSummary, setImportSummary] = useState<Omit<ImportResult, 'records'> | null>(null);
   const [isSample, setIsSample] = useState(false);
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState<ParseProgress | null>(null);
@@ -27,8 +28,9 @@ export default function Home() {
 
   useEffect(() => () => workerRef.current?.terminate(), []);
 
-  const finish = (records: ProcessedRecord[], sample: boolean) => {
+  const finish = (records: ProcessedRecord[], sample: boolean, summary: Omit<ImportResult, 'records'> | null = null) => {
     setProcessedData(records);
+    setImportSummary(summary);
     setIsSample(sample);
     setLoading(false);
     setProgress(null);
@@ -42,12 +44,16 @@ export default function Home() {
   };
 
   const onDrop = useCallback(async (acceptedFiles: File[], rejections: FileRejection[]) => {
-    if (rejections.length > 0) {
-      const names = rejections.map(r => `"${r.file.name}"`).join(', ');
-      fail(`${names} ${rejections.length === 1 ? "isn't a" : "aren't"} .json file${rejections.length === 1 ? '' : 's'}. Unzip your Spotify export and choose the Streaming_History_Audio_*.json files inside.`);
+    // Non-.json files are skipped (and listed later) as long as some .json files remain.
+    const skipped: SkippedFile[] = rejections.map(r => ({ name: r.file.name, reason: "isn't a .json file" }));
+    if (acceptedFiles.length === 0) {
+      if (rejections.length > 0) {
+        fail(
+          `${rejections.length === 1 ? `"${rejections[0].file.name}" isn't a .json file` : "None of these files are .json files"}. Unzip your Spotify export and choose the Streaming_History_Audio_*.json files inside.`
+        );
+      }
       return;
     }
-    if (acceptedFiles.length === 0) return;
 
     setLoading(true);
     setError(null);
@@ -64,8 +70,10 @@ export default function Home() {
         else {
           worker.terminate();
           workerRef.current = null;
-          if (msg.type === 'done') finish(msg.records, false);
-          else fail(msg.message);
+          if (msg.type === 'done') {
+            const { records, ...summary } = msg.result;
+            finish(records, false, summary);
+          } else fail(msg.message);
         }
       };
       worker.onerror = () => {
@@ -73,12 +81,13 @@ export default function Home() {
         workerRef.current = null;
         fail('Something went wrong while reading your files. Please try again.');
       };
-      worker.postMessage({ files: acceptedFiles });
+      worker.postMessage({ files: acceptedFiles, skipped });
       return;
     }
 
     try {
-      finish(await parseStreamingFiles(acceptedFiles, setProgress), false);
+      const { records, ...summary } = await parseStreamingFiles(acceptedFiles, setProgress, skipped);
+      finish(records, false, summary);
     } catch (err) {
       fail(err instanceof Error ? err.message : 'Something went wrong while reading your files.');
     }
@@ -103,12 +112,15 @@ export default function Home() {
 
   const resetData = () => {
     setProcessedData(null);
+    setImportSummary(null);
     setIsSample(false);
     setError(null);
   };
 
   if (processedData) {
-    return <Dashboard data={processedData} onReset={resetData} isSample={isSample} />;
+    return (
+      <Dashboard data={processedData} onReset={resetData} isSample={isSample} importSummary={importSummary} />
+    );
   }
 
   const readingPct =

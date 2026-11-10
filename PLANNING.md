@@ -98,16 +98,23 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - [x] Parse uploads in a Web Worker and show progress (e.g. "Parsed 3 of 8 files"); friendlier error messages
 - [x] Open Graph image and meta tags
 
+### Step 5 — Data correctness ✅ (2026-11-09)
+- [x] Timezones for every country (generated from the IANA tz database), with nearest-play inference for missing countries
+- [x] Podcasts and audiobooks excluded from all totals (music only)
+- [x] Guard rails for wrong uploads and for "zero playable tracks"
+
 ### Later / ideas (not committed)
+- **Podcasts and audiobooks tab/page**: they're currently excluded and counted in the import notice (decision 2026-11-09). A dedicated tab could use `episode_show_name`, `episode_name`, `audiobook_title` and so on; `isPodcastOrAudiobook()` in `lib/preprocessing.ts` already identifies them.
+- `/api/preprocess` is unused; leave it alone for now (user decision 2026-11-09).
+- Regenerate `lib/countryTimezones.ts` when the tz database changes: `node scripts/generate-country-timezones.mjs`.
 - ~~Milestones computed in O(n²)~~ — fixed 2026-11-09 (running sum)
 - Album selection resets when leaving the Albums tab (could lift into Dashboard state)
 - Sample data has no Spotify track IDs, so the Top Tracks players don't appear in the demo (by design: no real tracks)
-- `calculateAnalytics` crashes if there are zero playable tracks (`topTracks[0]` undefined in "most listened track"); unlikely with real exports, but worth guarding
+- ~~`calculateAnalytics` crashes with zero playable tracks~~ — guarded 2026-11-09
 - Weekday averages and the month × weekday heatmap sum all years together; consider normalizing by how many of each day occur
 - ~~**Bug:** `weekdayHours` was weighted by play count~~ — fixed 2026-11-09 (see Work Log).
-- Timezone map covers only IN, US and QA; other countries fall back to UTC
-- Podcast and audiobook rows (null track metadata) are counted in total time; decide how to handle them
-- `POST /api/preprocess` is unused
+- ~~Timezone map covers only IN, US and QA~~ — fixed 2026-11-09 (all countries)
+- ~~Podcast and audiobook rows counted in total time~~ — excluded 2026-11-09
 
 ---
 
@@ -124,6 +131,34 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-09 — Step 5: Timezones, music-only totals, upload guard rails
+**Done**
+- **Timezones for every country.**
+  - `lib/countryTimezones.ts` maps all 248 country codes (including Kosovo `XK`) to one IANA timezone. It's generated from the tz database's `zone.tab` (2026e) by `scripts/generate-country-timezones.mjs`.
+  - Countries with several zones (US, RU, CA, BR, AU, MX, ID and 24 more) use their most populous zone, usually the capital's. That's listed in the script's `PRIMARY` table, and the script refuses to run if a multi-zone country has no entry.
+  - India, the US and Qatar keep the same zones as before.
+- **Missing country.** The hard-coded "US after 2024-08-04, India before" fallback (specific to the original author's history) is gone. A play with no country or `ZZ` now borrows the country of the **nearest play in time** that has one. If no play has a country at all, the viewer's browser timezone is used. The Countries chart still shows only what Spotify reported; the borrowed country only affects local time.
+- If a browser doesn't recognize a newer zone name, the code tries its older alias (e.g. `Europe/Kyiv` → `Europe/Kiev`) and then UTC.
+- **Music only.** Podcast episodes and audiobook chapters (`isPodcastOrAudiobook()`) are excluded from all totals and charts.
+- **Import cleanup** (`preprocessWithReport()`): drops rows with no valid timestamp and exact duplicate plays (same ts, track, ms and platform, e.g. the same file uploaded twice), and counts everything it drops. Country-name lookup now uses a cached Map, so it's no longer a search per record.
+- **Upload guard rails** (`lib/parseFiles.ts`):
+  - Non-history files (Userdata.json, Playlist1.json, non-.json files) are **skipped and listed** instead of failing the whole upload, so dropping the entire unzipped export folder works.
+  - The upload only fails when nothing usable is left, with a specific message: no valid files, only podcasts/audiobooks, or only 0-second plays.
+- **Import notice** (`components/ImportNotice.tsx`): a dismissible note on the dashboard saying what was left out (podcast/audiobook plays, duplicates, bad rows, skipped files).
+- **Analytics guards**: `calculateAnalytics([])` no longer crashes (most-listened track and first song are guarded; first song prefers the first play with a track name). The dashboard shows a "No listening in …" empty state, with a "Show all years" button, if the selected years only contain empty plays.
+
+**Changed files**
+- New: `lib/countryTimezones.ts` (generated), `scripts/generate-country-timezones.mjs`, `components/ImportNotice.tsx`
+- Updated: `lib/preprocessing.ts`, `lib/parseFiles.ts`, `lib/parser.worker.ts`, `lib/analytics.ts`, `app/page.tsx`, `components/Dashboard.tsx`
+
+**Notes / decisions**
+- User decisions: podcasts and audiobooks are excluded for now (a separate tab later); `/api/preprocess` stays as is.
+- **Expect the numbers to change slightly** for existing data: totals drop by the podcast/audiobook time; plays with `ZZ` (previously UTC) and plays with no country now use the nearest known country; duplicates are removed.
+- Tested with the real code: local time for US/IN/QA/GB/JP/BR/AU/NP/DE (with daylight saving), nearest-country inference, browser fallback, the report counts, empty and 0-second analytics, a mixed-folder upload, and all error paths. Sample data is unaffected (20,042 plays, nothing dropped). `tsc`, `next lint` and `next build` pass.
+
+**Next**
+- User: review with real data in `npm run dev`, then commit and push.
 
 ### 2026-11-09 — Step 4: Sections and landing page
 **Done**

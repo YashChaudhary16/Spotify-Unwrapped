@@ -245,11 +245,12 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     const timeB = typeof b.timestamp === 'string' ? parseISO(b.timestamp).getTime() : b.timestamp.getTime();
     return timeA - timeB;
   });
-  const firstRecord = sortedByTime[0];
+  // Prefer the first play that actually has a track name.
+  const firstRecord = sortedByTime.find(r => r.master_metadata_track_name) ?? sortedByTime[0];
   const firstSong = {
-    track: firstRecord.master_metadata_track_name || 'Unknown',
-    artist: firstRecord.master_metadata_album_artist_name || 'Unknown',
-    date: firstRecord.date,
+    track: firstRecord?.master_metadata_track_name || 'Unknown',
+    artist: firstRecord?.master_metadata_album_artist_name || 'Unknown',
+    date: firstRecord?.date ?? '',
   };
   
   // Milestones
@@ -268,9 +269,10 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     .filter((m): m is { hours: number; date: string } => m !== null);
   
   // Most listened track
-  const mostListened = topTracks[0];
+  // Guard: with no playable tracks (empty range, bad upload) there is no "most listened" track.
+  const mostListened = topTracks[0] ?? { track: '—', hours: 0, trackId: null, artist: null };
   const mostListenedDate = validRecords
-    .filter(r => r.master_metadata_track_name === mostListened.track)
+    .filter(r => topTracks.length > 0 && r.master_metadata_track_name === mostListened.track)
     .reduce((acc, r) => {
       const current = acc.get(r.date) || 0;
       acc.set(r.date, current + r.hours);
