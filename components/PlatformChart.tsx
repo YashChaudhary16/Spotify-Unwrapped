@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { MonitorSmartphone } from 'lucide-react';
+import { CHART_COLORS, barCursor, gridProps, xAxisProps, yAxisProps } from '@/lib/chartTheme';
+import { formatDurationShort } from '@/lib/format';
+import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 interface PlatformChartProps {
   data: { platform: string; hours: number }[];
@@ -9,32 +16,22 @@ interface PlatformChartProps {
 
 export default function PlatformChart({ data }: PlatformChartProps) {
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
+  const { unit } = useTimeUnit();
 
   return (
-    <div className="mb-12">
-      <h2 className="text-3xl font-bold mb-6 text-spotify-green">🖥️ Platform Usage Comparison</h2>
-      <div className="bg-spotify-gray/50 rounded-lg p-6">
+    <Section title="Platforms" icon={MonitorSmartphone} subtitle="Listening time by device type">
+      <Card>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-            <XAxis dataKey="platform" stroke="#B3B3B3" />
-            <YAxis stroke="#B3B3B3" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#282828',
-                border: '1px solid #404040',
-                borderRadius: '8px',
-              }}
-              cursor={{ fill: 'transparent' }}       // disables the light hover overlay
-              labelStyle={{ color: '#fff' }}
-              itemStyle={{ color: '#1DB954' }}
-              formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
-            />
-            <Bar dataKey="hours" radius={[8, 8, 0, 0]} activeBar={false}>
+            <CartesianGrid {...gridProps} />
+            <XAxis {...xAxisProps} dataKey="platform" />
+            <YAxis {...yAxisProps} tickFormatter={v => formatDurationShort(v, unit)} />
+            <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />} />
+            <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
               {data.map((entry, index) => (
                 <Cell
                   key={`cell-${entry.platform}`}
-                  fill={activeIndex === index ? '#1ED760' : '#1DB954'}
+                  fill={CHART_COLORS.accent}
                   style={{
                     transform: activeIndex === index ? 'translateY(-6px)' : 'translateY(0)',
                     transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
@@ -48,8 +45,7 @@ export default function PlatformChart({ data }: PlatformChartProps) {
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </div>
-    </div>
+      </Card>
+    </Section>
   );
 }
-

@@ -17,7 +17,20 @@ import {
   Bar,
   Cell,
 } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { Clock, Disc3, GitCompare, Grid3x3, Layers, TrendingUp, Trophy, Users } from 'lucide-react';
+import {
+  CHART_COLORS,
+  barCursor,
+  gridProps,
+  gridPropsHorizontalBars,
+  xAxisProps,
+  yAxisProps,
+} from '@/lib/chartTheme';
+import { formatDate, formatDuration, formatDurationShort, formatNumber, formatPercent } from '@/lib/format';
+import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { Section } from '@/components/ui/Section';
+import { Card, CardTitle } from '@/components/ui/Card';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 interface AlbumAnalyticsProps {
   albums: AlbumStat[];
@@ -33,7 +46,11 @@ const depthLabel = (depthScore: number) => {
   return 'Album-through listens';
 };
 
+/** Inner panel inside a Card. */
+const panel = 'rounded-lg border border-spotify-border bg-spotify-highlight p-4';
+
 export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalyticsProps) {
+  const { unit } = useTimeUnit();
   const hasAlbums = Array.isArray(albums) && albums.length > 0;
   const [selectedAlbumKey, setSelectedAlbumKey] = useState(hasAlbums ? albums[0].key : '');
   const [comparisonKey, setComparisonKey] = useState(hasAlbums ? (albums[1]?.key || albums[0].key) : '');
@@ -68,31 +85,34 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
 
   if (!hasAlbums || !selectedAlbum) return null;
 
-  return (
-    <div className="mb-12">
-      <h2 className="text-3xl font-bold mb-6 text-spotify-green">💿 Albums</h2>
+  const tickFormatter = (v: number) => formatDurationShort(v, unit);
+  const durationFmt = (v: number) => formatDuration(v, unit);
 
+  return (
+    <Section title="Albums" icon={Disc3}>
       {/* Top Albums selector */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {topAlbums.map((album, idx) => (
           <button
             key={album.key}
             onClick={() => setSelectedAlbumKey(album.key)}
-            className={`text-left rounded-xl p-4 transition border ${
-              album.key === selectedAlbumKey ? 'border-spotify-green bg-spotify-gray/60' : 'border-spotify-gray bg-spotify-gray/30 hover:border-spotify-green/60'
+            className={`rounded-xl border p-4 text-left transition-colors ${
+              album.key === selectedAlbumKey
+                ? 'border-spotify-green bg-spotify-highlight'
+                : 'border-spotify-border bg-spotify-dark hover:bg-spotify-highlight'
             }`}
           >
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-sm text-spotify-lightgray">#{idx + 1}</div>
-              <div className="text-xs px-2 py-1 rounded-full bg-spotify-dark text-spotify-green">
+            <div className="mb-2 flex items-center justify-between">
+              <div className="text-sm font-semibold tabular-nums text-spotify-lightgray">#{idx + 1}</div>
+              <div className="rounded-full bg-spotify-gray px-2 py-1 text-xs text-spotify-lightgray">
                 {depthLabel(album.depthScore)}
               </div>
             </div>
-            <div className="text-lg font-semibold text-white">{album.album}</div>
-            <div className="text-sm text-spotify-lightgray mb-2">{album.artist}</div>
-            <div className="flex gap-3 text-sm">
-              <span className="text-spotify-green font-semibold">{album.hours.toFixed(1)} hrs</span>
-              <span className="text-spotify-lightgray">{album.plays} plays</span>
+            <div className="truncate text-lg font-semibold text-white">{album.album}</div>
+            <div className="mb-2 truncate text-sm text-spotify-lightgray">{album.artist}</div>
+            <div className="flex gap-3 text-sm tabular-nums">
+              <span className="font-semibold text-white">{formatDuration(album.hours, unit)}</span>
+              <span className="text-spotify-lightgray">{formatNumber(album.plays)} plays</span>
               <span className="text-spotify-lightgray">{album.uniqueTracks} tracks</span>
             </div>
           </button>
@@ -100,113 +120,99 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
       </div>
 
       {/* Selected album detail */}
-      <div className="bg-spotify-gray/40 rounded-xl p-6 mb-10">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
+      <Card className="mb-10">
+        <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h3 className="text-2xl font-semibold text-white">{selectedAlbum.album}</h3>
+            <h3 className="text-2xl font-bold text-white">{selectedAlbum.album}</h3>
             <p className="text-spotify-lightgray">{selectedAlbum.artist}</p>
           </div>
-          <div className="flex flex-wrap gap-4">
-            <StatPill label="Total hours" value={`${selectedAlbum.hours.toFixed(1)} hrs`} />
-            <StatPill label="Total plays" value={selectedAlbum.plays.toLocaleString()} />
+          <div className="flex flex-wrap gap-3">
+            <StatPill label="Total time" value={formatDuration(selectedAlbum.hours, unit)} />
+            <StatPill label="Total plays" value={formatNumber(selectedAlbum.plays)} />
             <StatPill label="Unique tracks" value={selectedAlbum.uniqueTracks.toString()} />
-            <StatPill label="Top track share" value={`${(selectedAlbum.depthScore * 100).toFixed(0)}%`} />
-            <StatPill label="First listen" value={selectedAlbum.firstListen} />
-            <StatPill label="Latest listen" value={selectedAlbum.lastListen} />
+            <StatPill label="Top track share" value={formatPercent(selectedAlbum.depthScore)} />
+            <StatPill label="First listen" value={formatDate(selectedAlbum.firstListen)} />
+            <StatPill label="Latest listen" value={formatDate(selectedAlbum.lastListen)} />
           </div>
         </div>
 
         {/* Most played track + depth */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="col-span-1 md:col-span-2 bg-spotify-dark rounded-lg p-4 border border-spotify-gray">
-            <h4 className="text-lg font-semibold text-spotify-green mb-2">Most-played track</h4>
-            <div className="text-xl text-white">{selectedAlbum.mostPlayedTrack.track || 'Unknown track'}</div>
+        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <div className={`col-span-1 md:col-span-2 ${panel}`}>
+            <CardTitle icon={Trophy} className="mb-2">Most-played track</CardTitle>
+            <div className="text-xl font-semibold text-white">{selectedAlbum.mostPlayedTrack.track || 'Unknown track'}</div>
             <div className="text-sm text-spotify-lightgray">{selectedAlbum.artist}</div>
-            <div className="mt-2 text-sm">
-              {selectedAlbum.mostPlayedTrack.hours.toFixed(2)} hrs · {selectedAlbum.mostPlayedTrack.plays} plays (
-              {selectedAlbum.hours > 0 ? ((selectedAlbum.mostPlayedTrack.hours / selectedAlbum.hours) * 100).toFixed(1) : '0'}% of album)
+            <div className="mt-2 text-sm tabular-nums text-spotify-lightgray">
+              {formatDuration(selectedAlbum.mostPlayedTrack.hours, unit)} · {formatNumber(selectedAlbum.mostPlayedTrack.plays)} plays ·{' '}
+              {formatPercent(selectedAlbum.hours > 0 ? selectedAlbum.mostPlayedTrack.hours / selectedAlbum.hours : 0, 1)} of album
             </div>
           </div>
-          <div className="bg-spotify-dark rounded-lg p-4 border border-spotify-gray">
-            <h4 className="text-lg font-semibold text-spotify-green mb-2">Depth vs repeat</h4>
-            <p className="text-sm text-spotify-lightgray mb-2">
-              {depthLabel(selectedAlbum.depthScore)} · {(selectedAlbum.depthScore * 100).toFixed(0)}% top track share
+          <div className={panel}>
+            <CardTitle icon={Layers} className="mb-2">Depth vs repeat</CardTitle>
+            <p className="mb-2 text-sm text-spotify-lightgray">
+              {depthLabel(selectedAlbum.depthScore)} · {formatPercent(selectedAlbum.depthScore)} top track share
             </p>
-            <div className="h-2 rounded-full bg-spotify-gray overflow-hidden">
+            <div className="h-1.5 overflow-hidden rounded-full bg-spotify-gray">
               <div
-                className="h-full bg-spotify-green transition-all"
+                className="h-full rounded-full bg-spotify-green transition-all"
                 style={{ width: `${Math.min(selectedAlbum.depthScore * 100, 100)}%` }}
               />
             </div>
-            <p className="text-xs text-spotify-lightgray mt-2">
+            <p className="mt-2 text-xs text-spotify-lightgray">
               Top track share reflects % of album listening time spent on its most-played track.
             </p>
           </div>
         </div>
 
         {/* Momentum and session placement */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 bg-spotify-dark rounded-lg p-4 border border-spotify-gray">
-            <h4 className="text-lg font-semibold text-spotify-green mb-4">Album momentum</h4>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <div className={`lg:col-span-2 ${panel}`}>
+            <CardTitle icon={TrendingUp}>Album momentum</CardTitle>
             <ResponsiveContainer width="100%" height={320}>
               <LineChart
                 data={selectedAlbum.timeSeries.map(d => ({
                   ...d,
-                  dateFormatted: format(parseISO(d.date), 'MMM dd, yyyy'),
+                  dateFormatted: formatDate(d.date, 'MMM dd, yyyy'),
                 }))}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+                <CartesianGrid {...gridProps} />
                 <XAxis
+                  {...xAxisProps}
                   dataKey="dateFormatted"
-                  stroke="#B3B3B3"
                   angle={-35}
                   textAnchor="end"
                   height={70}
                   interval="preserveStartEnd"
                 />
-                <YAxis stroke="#B3B3B3" />
+                <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
                 <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#282828',
-                    border: '1px solid #404040',
-                    borderRadius: '8px',
-                    color: '#fff',
-                  }}
+                  cursor={{ stroke: CHART_COLORS.tick, strokeWidth: 1 }}
+                  content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />}
                 />
                 <Line
                   type="monotone"
                   dataKey="hours"
-                  stroke="#1DB954"
+                  stroke={CHART_COLORS.accent}
                   strokeWidth={2}
-                  dot={{ fill: '#1DB954', r: 3 }}
+                  dot={{ fill: CHART_COLORS.accent, r: 3 }}
                 />
               </LineChart>
             </ResponsiveContainer>
           </div>
 
-          <div className="bg-spotify-dark rounded-lg p-4 border border-spotify-gray">
-            <h4 className="text-lg font-semibold text-spotify-green mb-4">Session placement</h4>
+          <div className={panel}>
+            <CardTitle icon={Clock}>Session placement</CardTitle>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={selectedAlbum.timeOfDay}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-                <XAxis dataKey="bucket" stroke="#B3B3B3" tick={{ fontSize: 12 }} interval={0} />
-                <YAxis stroke="#B3B3B3" />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#282828',
-                    border: '1px solid #404040',
-                    borderRadius: '8px',
-                  }}
-                  cursor={{ fill: 'transparent' }}
-                  labelStyle={{ color: '#fff' }}
-                  itemStyle={{ color: '#1DB954' }}
-                  formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
-                />
-                <Bar dataKey="hours" radius={[6, 6, 0, 0]} activeBar={false}>
+                <CartesianGrid {...gridProps} />
+                <XAxis {...xAxisProps} dataKey="bucket" tick={{ ...xAxisProps.tick, fontSize: 11 }} interval={0} />
+                <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
+                <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />} />
+                <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
                   {selectedAlbum.timeOfDay.map((entry, idx) => (
                     <Cell
                       key={entry.bucket}
-                      fill={activeSessionIdx === idx ? '#1ED760' : '#1DB954'}
+                      fill={CHART_COLORS.accent}
                       style={{
                         transform: activeSessionIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
                         transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
@@ -224,18 +230,21 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         </div>
 
         {/* Listening density */}
-        <div className="bg-spotify-dark rounded-lg p-4 border border-spotify-gray mt-6">
-          <h4 className="text-lg font-semibold text-spotify-green mb-4">Listening density (month x weekday)</h4>
-          <p className="text-sm text-spotify-lightgray mb-3">
-            Each cell is total listening hours on that weekday for that month, for this album. Brighter cells mean more hours.
-          </p>
+        {/* TODO(Step 2): scale colors against the whole grid (currently per month), add legend. */}
+        <div className={`mt-4 ${panel}`}>
+          <CardTitle
+            icon={Grid3x3}
+            subtitle="Each cell is total listening hours on that weekday for that month, for this album. Brighter cells mean more hours."
+          >
+            Listening density (month × weekday)
+          </CardTitle>
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse">
+            <table className="w-full border-collapse tabular-nums">
               <thead>
                 <tr>
-                  <th className="p-2 text-left text-spotify-lightgray">Month</th>
+                  <th className="p-2 text-left text-sm font-medium text-spotify-lightgray">Month</th>
                   {WEEKDAY_ORDER.map(day => (
-                    <th key={day} className="p-2 text-center text-spotify-lightgray text-xs">
+                    <th key={day} className="p-2 text-center text-xs font-medium text-spotify-lightgray">
                       {day.slice(0, 3)}
                     </th>
                   ))}
@@ -247,12 +256,12 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
                   const maxHours = Math.max(...row.map(r => r.hours), 1);
                   return (
                     <tr key={month}>
-                      <td className="p-2 font-semibold">{month}</td>
+                      <td className="p-2 text-sm font-semibold">{month}</td>
                       {WEEKDAY_ORDER.map(weekday => {
                         const entry = row.find(r => r.weekday === weekday);
                         const hours = entry?.hours || 0;
                         const intensity = hours / maxHours;
-                        const bgColor = `rgba(29, 185, 84, ${Math.max(intensity, 0.1)})`;
+                        const bgColor = `rgba(30, 215, 96, ${Math.max(intensity, 0.1)})`;
                         return (
                           <td
                             key={weekday}
@@ -270,14 +279,13 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
             </table>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Artist coverage */}
-      <div className="bg-spotify-gray/40 rounded-xl p-6 mb-10">
-        <h3 className="text-2xl font-semibold text-white mb-4">Artist coverage by albums</h3>
-        <p className="text-sm text-spotify-lightgray mb-4">
-          Which albums dominate each artist&apos;s listening time.
-        </p>
+      <Card className="mb-10">
+        <CardTitle icon={Users} subtitle="Which albums dominate each artist's listening time. Hover a bar to see the top album and its share.">
+          Artist coverage by albums
+        </CardTitle>
         <ResponsiveContainer width="100%" height={360}>
           <BarChart
             data={artistCoverage.slice(0, 8).map(artist => ({
@@ -288,52 +296,34 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
             }))}
             layout="vertical"
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-            <XAxis type="number" stroke="#B3B3B3" />
-            <YAxis dataKey="artist" type="category" stroke="#B3B3B3" width={120} />
+            <CartesianGrid {...gridPropsHorizontalBars} />
+            <XAxis {...xAxisProps} type="number" tickFormatter={tickFormatter} />
+            <YAxis {...yAxisProps} dataKey="artist" type="category" width={120} />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#282828',
-                border: '1px solid #404040',
-                borderRadius: '8px',
-              }}
-              cursor={{ fill: 'transparent' }}
-              labelStyle={{ color: '#fff' }}
-              itemStyle={{ color: '#1DB954' }}
-              formatter={(value, name, props: any) => {
-                if (name === 'hours') return [`${(value as number).toFixed(1)} hrs`, 'Hours'];
-                if (name === 'topShare') return [`${(value as number).toFixed(1)}%`, 'Top album share'];
-                return [value, name];
-              }}
-              labelFormatter={(_label, payload) => payload?.[0]?.payload?.topAlbum || ''}
-            />
-            <Bar dataKey="hours" radius={[8, 8, 8, 8]} activeBar={false}>
-              {artistCoverage.slice(0, 8).map((artist, idx) => (
-                <Cell
-                  key={artist.artist}
-                  fill="#1DB954"
-                  style={{
-                    transform: 'translateY(0)',
-                    transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
-                  }}
+              cursor={barCursor}
+              content={
+                <ChartTooltip
+                  hideSwatch
+                  nameFormatter={() => 'Artist total'}
+                  labelFormatter={(label, row) =>
+                    row ? `${label} · top album: ${row.topAlbum} (${formatNumber(row.topShare, 1)}%)` : label
+                  }
                 />
-              ))}
-            </Bar>
+              }
+            />
+            <Bar dataKey="hours" radius={[0, 4, 4, 0]} activeBar={false} fill={CHART_COLORS.accent} />
           </BarChart>
         </ResponsiveContainer>
-        <div className="text-xs text-spotify-lightgray mt-2">
-          Tooltip shows each artist&apos;s top album and its share of that artist&apos;s hours.
-        </div>
-      </div>
+      </Card>
 
       {/* Comparison */}
-      <div className="bg-spotify-gray/40 rounded-xl p-6">
-        <h3 className="text-2xl font-semibold text-white mb-4">Album comparison</h3>
-        <div className="flex flex-col md:flex-row gap-4 mb-4">
+      <Card>
+        <CardTitle icon={GitCompare}>Album comparison</CardTitle>
+        <div className="mb-4 flex flex-col gap-4 md:flex-row">
           <select
             value={selectedAlbumKey}
             onChange={e => setSelectedAlbumKey(e.target.value)}
-            className="w-full md:w-1/2 bg-spotify-dark border border-spotify-gray rounded-lg px-4 py-2 text-white focus:outline-none focus:border-spotify-green"
+            className="w-full rounded-lg border border-spotify-border bg-spotify-gray px-4 py-2 text-white focus:border-spotify-green focus:outline-none md:w-1/2"
           >
             {albums.map(album => (
               <option key={album.key} value={album.key}>
@@ -344,7 +334,7 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
           <select
             value={comparisonKey}
             onChange={e => setComparisonKey(e.target.value)}
-            className="w-full md:w-1/2 bg-spotify-dark border border-spotify-gray rounded-lg px-4 py-2 text-white focus:outline-none focus:border-spotify-green"
+            className="w-full rounded-lg border border-spotify-border bg-spotify-gray px-4 py-2 text-white focus:border-spotify-green focus:outline-none md:w-1/2"
           >
             {albums.map(album => (
               <option key={album.key} value={album.key}>
@@ -355,28 +345,28 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         </div>
 
         {comparisonAlbum && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <CompareCard title="Listening hours" primary={selectedAlbum.hours} secondary={comparisonAlbum.hours} />
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <CompareCard title="Listening time" primary={selectedAlbum.hours} secondary={comparisonAlbum.hours} format={durationFmt} />
             <CompareCard title="Total plays" primary={selectedAlbum.plays} secondary={comparisonAlbum.plays} />
             <CompareCard title="Unique tracks" primary={selectedAlbum.uniqueTracks} secondary={comparisonAlbum.uniqueTracks} />
             <CompareCard
               title="Top track share"
-              primary={Number((selectedAlbum.depthScore * 100).toFixed(0))}
-              secondary={Number((comparisonAlbum.depthScore * 100).toFixed(0))}
-              suffix="%"
+              primary={selectedAlbum.depthScore}
+              secondary={comparisonAlbum.depthScore}
+              format={v => formatPercent(v)}
             />
           </div>
         )}
-      </div>
-    </div>
+      </Card>
+    </Section>
   );
 }
 
 function StatPill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="px-3 py-2 rounded-lg bg-spotify-dark border border-spotify-gray text-sm">
-      <div className="text-spotify-lightgray">{label}</div>
-      <div className="font-semibold text-white">{value}</div>
+    <div className="rounded-lg border border-spotify-border bg-spotify-highlight px-3 py-2 text-sm">
+      <div className="text-xs text-spotify-lightgray">{label}</div>
+      <div className="font-semibold tabular-nums text-white">{value}</div>
     </div>
   );
 }
@@ -385,35 +375,28 @@ function CompareCard({
   title,
   primary,
   secondary,
-  suffix = '',
+  format = v => formatNumber(v),
 }: {
   title: string;
   primary: number;
   secondary: number;
-  suffix?: string;
+  format?: (value: number) => string;
 }) {
-  const max = Math.max(primary, secondary, 1);
+  const max = Math.max(primary, secondary, Number.EPSILON);
   return (
-    <div className="bg-spotify-dark rounded-lg p-4 border border-spotify-gray">
-      <div className="text-spotify-green font-semibold mb-2">{title}</div>
-      <div className="flex items-center justify-between text-white mb-2">
-        <span className="font-bold">{primary.toLocaleString()} {suffix}</span>
-        <span className="text-spotify-lightgray">vs</span>
-        <span className="font-bold">{secondary.toLocaleString()} {suffix}</span>
+    <div className={panel}>
+      <div className="mb-2 text-sm font-semibold text-white">{title}</div>
+      <div className="mb-2 flex items-center justify-between tabular-nums">
+        <span className="font-bold text-white">{format(primary)}</span>
+        <span className="text-xs text-spotify-muted">vs</span>
+        <span className="font-bold text-white">{format(secondary)}</span>
       </div>
-      <div className="h-2 rounded-full bg-spotify-gray overflow-hidden mb-1">
-        <div
-          className="h-full bg-spotify-green"
-          style={{ width: `${(primary / max) * 100}%` }}
-        />
+      <div className="mb-1 h-1.5 overflow-hidden rounded-full bg-spotify-gray">
+        <div className="h-full rounded-full bg-spotify-green" style={{ width: `${(primary / max) * 100}%` }} />
       </div>
-      <div className="h-2 rounded-full bg-spotify-gray overflow-hidden">
-        <div
-          className="h-full bg-spotify-lightgray"
-          style={{ width: `${(secondary / max) * 100}%` }}
-        />
+      <div className="h-1.5 overflow-hidden rounded-full bg-spotify-gray">
+        <div className="h-full rounded-full" style={{ width: `${(secondary / max) * 100}%`, backgroundColor: CHART_COLORS.neutral }} />
       </div>
     </div>
   );
 }
-

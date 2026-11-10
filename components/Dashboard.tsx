@@ -1,8 +1,12 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { ShieldCheck, SlidersHorizontal, Upload } from 'lucide-react';
 import { ProcessedRecord } from '@/lib/preprocessing';
-import { calculateAnalytics, getArtistAnalytics, Analytics } from '@/lib/analytics';
+import { calculateAnalytics, getArtistAnalytics } from '@/lib/analytics';
+import { Brand } from '@/components/ui/Brand';
+import { Card, CardTitle } from '@/components/ui/Card';
+import { TimeUnitToggle } from '@/components/ui/TimeUnitToggle';
 import Metrics from './Metrics';
 import TopTracks from './TopTracks';
 import PlatformChart from './PlatformChart';
@@ -60,33 +64,32 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
   return (
     <main className="min-h-screen bg-spotify-black text-white">
       {/* Header */}
-      <div className="bg-spotify-dark border-b border-spotify-gray sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 bg-spotify-green rounded-full flex items-center justify-center">
-              <span className="text-2xl">🎧</span>
-            </div>
-            <h1 className="text-2xl font-bold text-spotify-green">Spotify Analytics</h1>
+      <header className="sticky top-0 z-50 border-b border-spotify-border bg-spotify-black/90 backdrop-blur">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 px-4 py-3">
+          <Brand />
+          <div className="flex flex-wrap items-center gap-3">
+            <TimeUnitToggle />
+            <button
+              onClick={onReset}
+              className="flex items-center gap-2 rounded-full border border-spotify-muted px-4 py-1.5 text-sm font-semibold text-white transition-colors hover:border-white"
+            >
+              <Upload className="h-4 w-4" aria-hidden />
+              Upload new data
+            </button>
           </div>
-          <button
-            onClick={onReset}
-            className="px-4 py-2 bg-spotify-gray hover:bg-spotify-lightgray rounded-lg transition-colors"
-          >
-            Upload New Data
-          </button>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Sidebar Filters */}
-        <div className="mb-8 bg-spotify-gray/50 rounded-lg p-6">
-          <h2 className="text-xl font-semibold mb-4 text-spotify-green">📅 Filters</h2>
-          
+      <div className="mx-auto max-w-7xl px-4 py-8">
+        {/* Filters — TODO(Step 3): move into a compact header bar */}
+        <Card className="mb-12">
+          <CardTitle icon={SlidersHorizontal}>Filters</CardTitle>
+
           <div className="mb-6">
-            <label className="block mb-2 text-spotify-lightgray">Time Range (Years):</label>
+            <span className="mb-2 block text-sm font-medium text-spotify-lightgray">Years</span>
             <div className="flex flex-wrap gap-3">
               {availableYears.map(year => (
-                <label key={year} className="flex items-center gap-2 cursor-pointer">
+                <label key={year} className="flex cursor-pointer items-center gap-2 tabular-nums">
                   <input
                     type="checkbox"
                     checked={selectedYears.includes(year)}
@@ -97,7 +100,7 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
                         setSelectedYears(selectedYears.filter(y => y !== year));
                       }
                     }}
-                    className="w-4 h-4 text-spotify-green bg-spotify-dark border-spotify-gray rounded focus:ring-spotify-green"
+                    className="h-4 w-4"
                   />
                   <span>{year}</span>
                 </label>
@@ -106,10 +109,11 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
           </div>
 
           <div className="mb-6">
-            <label className="block mb-2 text-spotify-lightgray">
-              Number of Top Tracks: {topN}
+            <label htmlFor="top-n" className="mb-2 block text-sm font-medium text-spotify-lightgray">
+              Number of top tracks: <span className="tabular-nums text-white">{topN}</span>
             </label>
             <input
+              id="top-n"
               type="range"
               min="5"
               max="50"
@@ -120,11 +124,12 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
           </div>
 
           <div>
-            <label className="block mb-2 text-spotify-lightgray">Artist Analysis:</label>
+            <label htmlFor="artist" className="mb-2 block text-sm font-medium text-spotify-lightgray">Artist analysis</label>
             <select
+              id="artist"
               value={selectedArtist}
               onChange={(e) => setSelectedArtist(e.target.value)}
-              className="w-full bg-spotify-dark border border-spotify-gray rounded-lg px-4 py-2 text-white focus:outline-none focus:border-spotify-green"
+              className="w-full rounded-lg border border-spotify-border bg-spotify-gray px-4 py-2 text-white focus:border-spotify-green focus:outline-none"
             >
               <option value="(All Artists)">(All Artists)</option>
               {artists.map(artist => (
@@ -132,7 +137,7 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
               ))}
             </select>
           </div>
-        </div>
+        </Card>
 
         {/* Main Metrics */}
         <Metrics analytics={analytics} />
@@ -196,14 +201,15 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
         )}
 
         {/* Privacy Notice */}
-        <div className="mt-12 p-4 bg-spotify-gray/30 rounded-lg border border-spotify-green/30">
-          <p className="text-sm text-spotify-lightgray">
-            <strong className="text-spotify-green">🔒 Privacy Notice:</strong> Your data is processed entirely in-memory and never saved to disk. 
-            IP addresses are automatically removed for your privacy. When you close this page, your data is completely removed.
+        <div className="mt-12 flex items-start gap-3 rounded-xl border border-spotify-border bg-spotify-dark p-4 text-sm text-spotify-lightgray">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-spotify-green" aria-hidden />
+          <p>
+            <strong className="font-semibold text-white">Private by design.</strong> Your data is processed entirely
+            in your browser and never uploaded or saved. IP addresses are removed automatically, and closing this page
+            clears everything.
           </p>
         </div>
       </div>
     </main>
   );
 }
-

@@ -1,34 +1,30 @@
+'use client';
+
+import { CalendarClock, Clock, ListMusic, BarChart3 } from 'lucide-react';
 import { Analytics } from '@/lib/analytics';
+import { formatDuration, formatNumber } from '@/lib/format';
+import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { Section } from '@/components/ui/Section';
+import { StatCard } from '@/components/ui/StatCard';
 
 interface MetricsProps {
   analytics: Analytics;
 }
 
 export default function Metrics({ analytics }: MetricsProps) {
-  const formatAvgTime = (hours: number) => {
-    const h = Math.floor(hours);
-    const m = Math.round((hours - h) * 60);
-    return `${h} hrs ${m} mins`;
-  };
+  const { unit } = useTimeUnit();
 
   return (
-    <div className="mb-12">
-      <h2 className="text-3xl font-bold mb-6 text-spotify-green">📊 Overall Statistics</h2>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="metric-card">
-          <h1>{analytics.totalHours.toFixed(2)}</h1>
-          <p>Total Listening Hours</p>
-        </div>
-        <div className="metric-card">
-          <h1>{analytics.totalTracks.toLocaleString()}</h1>
-          <p>Total Tracks Played</p>
-        </div>
-        <div className="metric-card">
-          <h1>{formatAvgTime(analytics.avgHoursPerDay)}</h1>
-          <p>Avg Listen Time / Day</p>
-        </div>
+    <Section title="Overview" icon={BarChart3}>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <StatCard icon={Clock} label="Total listening time" value={formatDuration(analytics.totalHours, unit)} />
+        <StatCard icon={ListMusic} label="Tracks played" value={formatNumber(analytics.totalTracks)} />
+        <StatCard
+          icon={CalendarClock}
+          label="Average per listening day"
+          value={formatDuration(analytics.avgHoursPerDay, unit)}
+        />
       </div>
-    </div>
+    </Section>
   );
 }
-

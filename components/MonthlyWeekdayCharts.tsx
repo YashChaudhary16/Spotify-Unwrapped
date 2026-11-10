@@ -2,6 +2,13 @@
 
 import { useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { CalendarDays, CalendarRange, Grid3x3, Sun } from 'lucide-react';
+import { CHART_COLORS, barCursor, gridProps, xAxisProps, yAxisProps } from '@/lib/chartTheme';
+import { formatDurationShort } from '@/lib/format';
+import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { Section } from '@/components/ui/Section';
+import { Card, CardTitle } from '@/components/ui/Card';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 interface MonthlyWeekdayChartsProps {
   monthlyHours: { month: string; hours: number }[];
@@ -19,6 +26,7 @@ export default function MonthlyWeekdayCharts({
 }: MonthlyWeekdayChartsProps) {
   const [activeMonthIdx, setActiveMonthIdx] = useState<number | null>(null);
   const [activeWeekdayIdx, setActiveWeekdayIdx] = useState<number | null>(null);
+  const { unit } = useTimeUnit();
 
   // Sort weekday data
   const sortedWeekdayHours = [...weekdayHours].sort(
@@ -33,34 +41,23 @@ export default function MonthlyWeekdayCharts({
   });
 
   const maxHours = Math.max(...heatmapData.map(d => d.hours), 1);
+  const tickFormatter = (v: number) => formatDurationShort(v, unit);
 
   return (
-    <div className="mb-12">
-      <h2 className="text-3xl font-bold mb-6 text-spotify-green">📅 Monthly and Weekday Listening Trends</h2>
-      
-      <div className="mb-6 bg-spotify-gray/50 rounded-lg p-6">
-        <h3 className="text-xl font-semibold mb-4 text-spotify-green">Total Listening Hours per Month</h3>
+    <Section title="Monthly and weekday trends" icon={CalendarDays}>
+      <Card className="mb-4">
+        <CardTitle icon={CalendarRange}>Listening time per month</CardTitle>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={monthlyHours}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-            <XAxis dataKey="month" stroke="#B3B3B3" />
-            <YAxis stroke="#B3B3B3" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#282828',
-                border: '1px solid #404040',
-                borderRadius: '8px',
-              }}
-              cursor={{ fill: 'transparent' }}
-              labelStyle={{ color: '#fff' }}
-              itemStyle={{ color: '#1DB954' }}
-              formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
-            />
-            <Bar dataKey="hours" radius={[8, 8, 0, 0]} activeBar={false}>
+            <CartesianGrid {...gridProps} />
+            <XAxis {...xAxisProps} dataKey="month" />
+            <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
+            <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />} />
+            <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
               {monthlyHours.map((entry, idx) => (
                 <Cell
                   key={entry.month}
-                  fill={activeMonthIdx === idx ? '#1ED760' : '#1DB954'}
+                  fill={CHART_COLORS.accent}
                   style={{
                     transform: activeMonthIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
                     transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
@@ -74,31 +71,21 @@ export default function MonthlyWeekdayCharts({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
 
-      <div className="mb-6 bg-spotify-gray/50 rounded-lg p-6">
-        <h3 className="text-xl font-semibold mb-4 text-spotify-green">Average Daily Listening Hours by Weekday</h3>
+      <Card className="mb-4">
+        <CardTitle icon={Sun}>Average daily listening by weekday</CardTitle>
         <ResponsiveContainer width="100%" height={400}>
           <BarChart data={sortedWeekdayHours}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
-            <XAxis dataKey="weekday" stroke="#B3B3B3" />
-            <YAxis stroke="#B3B3B3" />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: '#282828',
-                border: '1px solid #404040',
-                borderRadius: '8px',
-              }}
-              cursor={{ fill: 'transparent' }}
-              labelStyle={{ color: '#fff' }}
-              itemStyle={{ color: '#1DB954' }}
-              formatter={(value: number) => [`${value.toFixed(1)} hrs`, 'hours']}
-            />
-            <Bar dataKey="hours" radius={[8, 8, 0, 0]} activeBar={false}>
+            <CartesianGrid {...gridProps} />
+            <XAxis {...xAxisProps} dataKey="weekday" />
+            <YAxis {...yAxisProps} tickFormatter={tickFormatter} />
+            <Tooltip cursor={barCursor} content={<ChartTooltip hideSwatch nameFormatter={() => 'Average per day'} />} />
+            <Bar dataKey="hours" radius={[4, 4, 0, 0]} activeBar={false}>
               {sortedWeekdayHours.map((entry, idx) => (
                 <Cell
                   key={entry.weekday}
-                  fill={activeWeekdayIdx === idx ? '#1ED760' : '#1DB954'}
+                  fill={CHART_COLORS.accent}
                   style={{
                     transform: activeWeekdayIdx === idx ? 'translateY(-6px)' : 'translateY(0)',
                     transition: 'transform 150ms ease, fill 150ms ease, filter 150ms ease',
@@ -112,20 +99,23 @@ export default function MonthlyWeekdayCharts({
             </Bar>
           </BarChart>
         </ResponsiveContainer>
-      </div>
+      </Card>
 
-      <div className="bg-spotify-gray/50 rounded-lg p-6">
-        <h3 className="text-xl font-semibold mb-3 text-spotify-green">Listening Hours: Month vs. Weekday</h3>
-        <p className="text-sm text-spotify-lightgray mb-4">
-          Each cell is total listening hours on that weekday for that month. Brighter cells mean more hours.
-        </p>
+      {/* TODO(Step 2): stepped color scale + legend, distinct empty cells, contrast-aware text. */}
+      <Card>
+        <CardTitle
+          icon={Grid3x3}
+          subtitle="Each cell is total listening hours on that weekday for that month. Brighter cells mean more hours."
+        >
+          Month vs. weekday
+        </CardTitle>
         <div className="overflow-x-auto">
-          <table className="w-full border-collapse">
+          <table className="w-full border-collapse tabular-nums">
             <thead>
               <tr>
-                <th className="p-2 text-left text-spotify-lightgray">Month</th>
+                <th className="p-2 text-left text-sm font-medium text-spotify-lightgray">Month</th>
                 {WEEKDAY_ORDER.map(day => (
-                  <th key={day} className="p-2 text-center text-spotify-lightgray text-sm">
+                  <th key={day} className="p-2 text-center text-sm font-medium text-spotify-lightgray">
                     {day.slice(0, 3)}
                   </th>
                 ))}
@@ -136,11 +126,11 @@ export default function MonthlyWeekdayCharts({
                 const monthData = heatmapMatrix[month] || {};
                 return (
                   <tr key={month}>
-                    <td className="p-2 font-semibold">{month}</td>
+                    <td className="p-2 text-sm font-semibold">{month}</td>
                     {WEEKDAY_ORDER.map(weekday => {
                       const hours = monthData[weekday] || 0;
                       const intensity = hours / maxHours;
-                      const bgColor = `rgba(29, 185, 84, ${Math.max(intensity, 0.1)})`;
+                      const bgColor = `rgba(30, 215, 96, ${Math.max(intensity, 0.1)})`;
                       return (
                         <td
                           key={weekday}
@@ -157,8 +147,7 @@ export default function MonthlyWeekdayCharts({
             </tbody>
           </table>
         </div>
-      </div>
-    </div>
+      </Card>
+    </Section>
   );
 }
-

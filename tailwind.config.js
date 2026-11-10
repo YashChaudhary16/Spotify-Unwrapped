@@ -7,18 +7,25 @@ module.exports = {
   ],
   theme: {
     extend: {
+      // Spotify dark app palette — see PLANNING.md "Design tokens".
       colors: {
         spotify: {
-          green: '#1DB954',
-          black: '#121212',
-          dark: '#181818',
+          green: '#1ED760',        // accent: data + active state
+          'green-dark': '#1DB954', // accent hover/pressed
+          black: '#121212',        // page background
+          dark: '#181818',         // cards (elevated)
+          highlight: '#1F1F1F',    // card hover, inner panels
+          gray: '#282828',         // inputs, pressed, progress-bar tracks
+          border: '#2A2A2A',       // hairlines, gridlines
+          lightgray: '#B3B3B3',    // secondary text (subdued)
+          muted: '#7C7C7C',        // tertiary text
           darker: '#0A0A0A',
-          gray: '#282828',
-          lightgray: '#B3B3B3',
         },
+      },
+      fontFamily: {
+        sans: ['var(--font-figtree)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
     },
   },
   plugins: [],
 }
-

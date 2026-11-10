@@ -1,53 +1,54 @@
 'use client';
 
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { format, parseISO } from 'date-fns';
+import { TrendingUp } from 'lucide-react';
+import { CHART_COLORS, gridProps, xAxisProps, yAxisProps } from '@/lib/chartTheme';
+import { formatDate, formatDurationShort } from '@/lib/format';
+import { useTimeUnit } from '@/components/providers/TimeUnitProvider';
+import { Section } from '@/components/ui/Section';
+import { Card } from '@/components/ui/Card';
+import { ChartTooltip } from '@/components/ui/ChartTooltip';
 
 interface TimeSeriesChartProps {
   data: { date: string; hours: number }[];
 }
 
 export default function TimeSeriesChart({ data }: TimeSeriesChartProps) {
+  const { unit } = useTimeUnit();
   const formattedData = data.map(d => ({
     ...d,
-    dateFormatted: format(parseISO(d.date), 'MMM dd, yyyy'),
+    dateFormatted: formatDate(d.date, 'MMM dd, yyyy'),
   }));
 
   return (
-    <div className="mb-12">
-      <h2 className="text-3xl font-bold mb-6 text-spotify-green">📈 Listening Time Over Time</h2>
-      <div className="bg-spotify-gray/50 rounded-lg p-6">
+    <Section title="Listening over time" icon={TrendingUp} subtitle="Daily listening time">
+      <Card>
         <ResponsiveContainer width="100%" height={400}>
           <LineChart data={formattedData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#404040" />
+            <CartesianGrid {...gridProps} />
             <XAxis
+              {...xAxisProps}
               dataKey="dateFormatted"
-              stroke="#B3B3B3"
               angle={-45}
               textAnchor="end"
               height={100}
               interval="preserveStartEnd"
             />
-            <YAxis stroke="#B3B3B3" />
+            <YAxis {...yAxisProps} tickFormatter={v => formatDurationShort(v, unit)} />
             <Tooltip
-              contentStyle={{
-                backgroundColor: '#282828',
-                border: '1px solid #404040',
-                borderRadius: '8px',
-                color: '#fff',
-              }}
+              cursor={{ stroke: CHART_COLORS.tick, strokeWidth: 1 }}
+              content={<ChartTooltip hideSwatch nameFormatter={() => 'Listening time'} />}
             />
             <Line
               type="monotone"
               dataKey="hours"
-              stroke="#1DB954"
+              stroke={CHART_COLORS.accent}
               strokeWidth={2}
-              dot={{ fill: '#1DB954', r: 3 }}
+              dot={{ fill: CHART_COLORS.accent, r: 3 }}
             />
           </LineChart>
         </ResponsiveContainer>
-      </div>
-    </div>
+      </Card>
+    </Section>
   );
 }
-
