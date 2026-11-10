@@ -88,18 +88,21 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - [x] Searchable pickers for album comparison
 - [x] Handle "no years selected" on purpose: an empty selection is shown as the active **All** chip
 
-### Step 4 — Sections and landing page
-- [ ] Top tracks: lazy-loaded players, responsive width, artist name in each row
-- [ ] Headline stats: add unique tracks, unique artists, days active, top artist
-- [ ] Skips and replays: rank numbers, ellipsis for long names, move the total out of the heading
-- [ ] Streaks and milestones: formatted dates; milestone timeline
-- [ ] Landing page: one title, a proper upload icon, clearer instructions with a link to Spotify's data request page (mention it can take up to 30 days)
-- [ ] "Try with sample data" button plus a generator script for fake history
-- [ ] Parse uploads in a Web Worker and show progress (e.g. "Parsed 3 of 8 files"); friendlier error messages
-- [ ] Open Graph image and meta tags
+### Step 4 — Sections and landing page ✅ (2026-11-09; awaiting visual review)
+- [x] Top tracks: lazy-loaded players, responsive width, artist name in each row
+- [x] Headline stats: add unique tracks, unique artists, days active, top artist
+- [x] Skips and replays: rank numbers, ellipsis for long names, move the total out of the heading
+- [x] Streaks and milestones: formatted dates; milestone timeline
+- [x] Landing page: one title, a proper upload icon, clearer instructions with a link to Spotify's data request page (mention it can take up to 30 days)
+- [x] "Try with sample data" button plus a generator for fake history (in-browser, seeded — see Work Log)
+- [x] Parse uploads in a Web Worker and show progress (e.g. "Parsed 3 of 8 files"); friendlier error messages
+- [x] Open Graph image and meta tags
 
 ### Later / ideas (not committed)
-- Milestones are computed in O(n²) over days (`lib/analytics.ts` builds the running total by re-summing a slice for each day); use a running sum
+- ~~Milestones computed in O(n²)~~ — fixed 2026-11-09 (running sum)
+- Album selection resets when leaving the Albums tab (could lift into Dashboard state)
+- Sample data has no Spotify track IDs, so the Top Tracks players don't appear in the demo (by design: no real tracks)
+- `calculateAnalytics` crashes if there are zero playable tracks (`topTracks[0]` undefined in "most listened track"); unlikely with real exports, but worth guarding
 - Weekday averages and the month × weekday heatmap sum all years together; consider normalizing by how many of each day occur
 - ~~**Bug:** `weekdayHours` was weighted by play count~~ — fixed 2026-11-09 (see Work Log).
 - Timezone map covers only IN, US and QA; other countries fall back to UTC
@@ -121,6 +124,49 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-09 — Step 4: Sections and landing page
+**Done**
+- **Headline stats** (Overview → "At a glance"): 8 cards in a 4-column grid. They show total time, plays, days active (with "% of N days"), average per listening day, unique tracks, unique artists, top artist and top track; the subtitle shows the date range. Supporting fields added to `Analytics`: `uniqueTracks`, `uniqueArtists`, `topArtist`, `firstDate`, `lastDate`, `daysInRange`.
+- **Top tracks**: Spotify players are lazy-loaded (`components/ui/LazySpotifyEmbed.tsx`: they load about 200px before scrolling into view and fade in, with a same-size placeholder so the list doesn't jump). Each row has a thin bar showing its share of the #1 track and a full-width player on mobile.
+- **Skips and replays**: ranked lists with rank numbers, ellipsis plus the full name on hover, and the total in the subtitle.
+- **Milestones**: a vertical timeline with the latest milestone highlighted in green and "N days after the previous milestone". The biggest-day card shows the weekday.
+- **Landing page**:
+  - A real headline and subhead.
+  - **Try with sample data** button.
+  - Clearer 4-step instructions with a link to spotify.com/account/privacy and a note that it can take up to 30 days.
+  - A warning to choose *Extended streaming history*, not "Account data".
+- **Sample data** (`lib/sampleData.ts`): a seeded generator creating 2 years (2023–2024) of fictional listening: 16 made-up artists, about 20k plays. It includes artist "eras", album-through sessions, skips, shuffle, offline, 4 platforms and trips to India and Qatar. Generation takes about 26 ms and the data is identical every time. The dashboard shows a "You're viewing sample data" banner with an **Upload my data** button.
+- **Web Worker parsing** (`lib/parser.worker.ts` + `lib/parseFiles.ts`): files are read and processed off the main thread, with live progress ("Reading file 3 of 8 · name.json", then "Crunching 123,456 plays…"). If workers aren't available, parsing falls back to the main thread.
+- **Friendlier errors**, each with a heading:
+  - invalid JSON
+  - not streaming history
+  - the basic "Account data" export (StreamingHistory_music_*.json)
+  - no plays found
+  - non-.json files dropped
+- **Link previews and icon**:
+  - `app/opengraph-image.tsx` (1200×630, generated at build time)
+  - `app/icon.tsx` (green brand mark)
+  - `metadataBase`, Open Graph and Twitter `summary_large_image` metadata
+  - theme color `#121212`
+- Removed `public/favicon.ico`, which was a 12-byte text file containing "placeholder", i.e. a broken icon.
+- Fixed the O(n²) milestone calculation (now a running sum).
+
+**Changed files**
+- New: `components/ui/LazySpotifyEmbed.tsx`, `lib/{parseFiles,parser.worker,sampleData}.ts`, `app/{icon,opengraph-image}.tsx`
+- Updated: `app/{page,layout}.tsx`, `lib/analytics.ts`, `components/{Metrics,TopTracks,SkipsReplays,StreaksMilestones,Dashboard}.tsx`
+- Deleted: `public/favicon.ico`
+
+**Notes / decisions**
+- The sample data is **generated in the browser** instead of shipped as a JSON file. The equivalent file would be about 8 MB; the generator is a few KB and makes identical data every time. It has no Spotify track IDs, so the demo shows no players.
+- I rendered the OG image and icon on a local production server and looked at them; I fixed a bar overflow in the OG image.
+- Tested with the real code: sample data → preprocessing → analytics (all sections populated), plus all upload-error paths.
+- `tsc`, `next lint` and `next build` pass. The dashboard itself still hasn't been checked visually in a browser here.
+- **Correction after user review:** I had added `?utm_source=generator&theme=0` to the embed URL, and `theme=0` forces Spotify's dark gray player. That URL is reverted to the original plain one, so the players are colorful again (background taken from the album art). Lazy loading is kept. Don't add `theme=0` back.
+
+**Next**
+- User: review in `npm run dev` (try **Try with sample data**), then commit and push.
+- All four planned steps are done. Candidates for later are under "Later / ideas".
 
 ### 2026-11-09 — Step 3: Layout and navigation
 **Done**

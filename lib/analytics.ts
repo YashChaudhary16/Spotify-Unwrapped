@@ -35,6 +35,13 @@ export interface Analytics {
   totalTracks: number;
   uniqueDays: number;
   avgHoursPerDay: number;
+  uniqueTracks: number;
+  uniqueArtists: number;
+  topArtist: { name: string; hours: number } | null;
+  /** First and last listening date (yyyy-MM-dd) and the calendar days between them, inclusive. */
+  firstDate: string;
+  lastDate: string;
+  daysInRange: number;
   topTracks: TopTrack[];
   albumStats: AlbumStat[];
   artistAlbumCoverage: ArtistAlbumCoverage[];
@@ -68,7 +75,27 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
   const totalTracks = validRecords.length;
   const uniqueDays = new Set(records.map(r => r.date)).size;
   const avgHoursPerDay = uniqueDays > 0 ? totalHours / uniqueDays : 0;
-  
+
+  // Library breadth + date range
+  const uniqueTracks = new Set(
+    validRecords.map(r => r.track_id ?? r.master_metadata_track_name).filter(Boolean)
+  ).size;
+  const artistTotals = new Map<string, number>();
+  validRecords.forEach(r => {
+    const name = r.master_metadata_album_artist_name;
+    if (name) artistTotals.set(name, (artistTotals.get(name) || 0) + r.hours);
+  });
+  const uniqueArtists = artistTotals.size;
+  const topArtistEntry = Array.from(artistTotals.entries()).sort((a, b) => b[1] - a[1])[0];
+  const topArtist = topArtistEntry ? { name: topArtistEntry[0], hours: topArtistEntry[1] } : null;
+  let firstDate = '';
+  let lastDate = '';
+  records.forEach(r => {
+    if (!firstDate || r.date < firstDate) firstDate = r.date;
+    if (!lastDate || r.date > lastDate) lastDate = r.date;
+  });
+  const daysInRange = firstDate ? differenceInDays(parseISO(lastDate), parseISO(firstDate)) + 1 : 0;
+
   // Top tracks
   const trackMap = new Map<string, { hours: number; artist: string | null; trackId: string | null }>();
   validRecords.forEach(r => {
@@ -226,10 +253,11 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
   };
   
   // Milestones
-  const cumulative = timeSeries.map((entry, idx) => ({
-    date: entry.date,
-    hours: timeSeries.slice(0, idx + 1).reduce((sum, e) => sum + e.hours, 0),
-  }));
+  let runningHours = 0;
+  const cumulative = timeSeries.map(entry => {
+    runningHours += entry.hours;
+    return { date: entry.date, hours: runningHours };
+  });
   
   const milestoneHours = [100, 500, 1000, 2000, 5000, 10000, 20000];
   const milestones = milestoneHours
@@ -443,6 +471,12 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     totalTracks,
     uniqueDays,
     avgHoursPerDay,
+    uniqueTracks,
+    uniqueArtists,
+    topArtist,
+    firstDate,
+    lastDate,
+    daysInRange,
     topTracks,
     albumStats,
     artistAlbumCoverage,

@@ -22,38 +22,44 @@ export default function SkipsReplays({ skippedTracks, topPlayedTracks }: SkipsRe
           <CardTitle icon={SkipForward} subtitle={`${formatNumber(totalSkips)} skips across these tracks`}>
             Most skipped
           </CardTitle>
-          <div className="space-y-2">
-            {skippedTracks.length > 0 ? (
-              skippedTracks.map((track, idx) => (
-                <div key={idx} className="flex items-center justify-between gap-4 rounded-md bg-spotify-highlight p-3">
-                  <span className="truncate">{track.track}</span>
-                  <span className="shrink-0 font-semibold tabular-nums text-white">{formatNumber(track.count)} skips</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-spotify-lightgray">No skipped tracks found</p>
-            )}
-          </div>
+          <RankedList
+            empty="No skipped tracks found"
+            rows={skippedTracks.map(t => ({ label: t.track, value: `${formatNumber(t.count)} skips` }))}
+          />
         </Card>
 
         <Card>
           <CardTitle icon={Repeat} subtitle="Tracks you let play the longest">
             Most played without skipping
           </CardTitle>
-          <div className="space-y-2">
-            {topPlayedTracks.length > 0 ? (
-              topPlayedTracks.map((track, idx) => (
-                <div key={idx} className="flex items-center justify-between gap-4 rounded-md bg-spotify-highlight p-3">
-                  <span className="truncate">{track.track}</span>
-                  <span className="shrink-0 font-semibold tabular-nums text-white">{formatDuration(track.hours, unit)}</span>
-                </div>
-              ))
-            ) : (
-              <p className="text-spotify-lightgray">No data available</p>
-            )}
-          </div>
+          <RankedList
+            empty="No data available"
+            rows={topPlayedTracks.map(t => ({ label: t.track, value: formatDuration(t.hours, unit) }))}
+          />
         </Card>
       </div>
     </Section>
+  );
+}
+
+function RankedList({ rows, empty }: { rows: { label: string; value: string }[]; empty: string }) {
+  if (rows.length === 0) return <p className="text-spotify-lightgray">{empty}</p>;
+  return (
+    <ol className="space-y-1">
+      {rows.map((row, idx) => (
+        <li
+          key={idx}
+          className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-spotify-highlight"
+        >
+          <span className="w-6 shrink-0 text-right text-sm font-semibold tabular-nums text-spotify-lightgray">
+            {idx + 1}
+          </span>
+          <span className="min-w-0 flex-1 truncate text-white" title={row.label}>
+            {row.label}
+          </span>
+          <span className="shrink-0 text-sm font-semibold tabular-nums text-white">{row.value}</span>
+        </li>
+      ))}
+    </ol>
   );
 }

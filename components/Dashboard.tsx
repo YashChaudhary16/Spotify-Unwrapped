@@ -27,6 +27,8 @@ import AlbumAnalytics from './AlbumAnalytics';
 interface DashboardProps {
   data: ProcessedRecord[];
   onReset: () => void;
+  /** True when showing the generated demo history instead of the user's own files. */
+  isSample?: boolean;
 }
 
 type TabId = 'overview' | 'tracks' | 'habits' | 'albums' | 'artist';
@@ -47,7 +49,7 @@ const TOP_N_OPTIONS = [
   { value: '50', label: '50' },
 ];
 
-export default function Dashboard({ data, onReset }: DashboardProps) {
+export default function Dashboard({ data, onReset, isSample = false }: DashboardProps) {
   const { unit } = useTimeUnit();
   const [tab, setTab] = useState<TabId>('overview');
   /** Selected years; an empty list means "All years". */
@@ -216,6 +218,25 @@ export default function Dashboard({ data, onReset }: DashboardProps) {
       </header>
 
       <div className="mx-auto max-w-7xl px-4 py-8">
+        {isSample && (
+          <div className="mb-6 flex flex-col gap-3 rounded-xl border border-spotify-green/40 bg-spotify-green/10 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <p className="text-sm text-white">
+              <span className="font-semibold">You&apos;re viewing sample data.</span>{' '}
+              <span className="text-spotify-lightgray">
+                Two years of made-up listening by fictional artists. Upload your own export to see yours.
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={onReset}
+              className="flex shrink-0 items-center justify-center gap-2 rounded-full bg-spotify-green px-4 py-1.5 text-sm font-bold text-black transition-colors hover:bg-[#3BE477]"
+            >
+              <Upload className="h-4 w-4" aria-hidden />
+              Upload my data
+            </button>
+          </div>
+        )}
+
         <p className="mb-8 text-sm text-spotify-lightgray">
           <span className="font-semibold text-white">{yearSummary}</span> · {formatNumber(filteredData.length)} plays
         </p>

@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Figtree } from 'next/font/google';
 import { TimeUnitProvider } from '@/components/providers/TimeUnitProvider';
 import { Footer } from '@/components/ui/Footer';
@@ -10,13 +10,34 @@ const figtree = Figtree({
   display: 'swap',
 });
 
+const SITE_URL = 'https://spotify-unwrapped-nine.vercel.app';
+const TITLE = 'Unwrapped — Your Spotify listening, analyzed';
+const DESCRIPTION =
+  'A private, in-browser dashboard for your Spotify extended streaming history: top tracks, albums, artists, habits and streaks. Nothing is uploaded or stored.';
+
+// The icon and the Open Graph image come from app/icon.tsx and app/opengraph-image.tsx.
 export const metadata: Metadata = {
-  title: 'Unwrapped — Your Spotify listening, analyzed',
-  description:
-    'A private, in-browser dashboard for your Spotify extended streaming history. Nothing is uploaded or stored.',
-  icons: {
-    icon: '/favicon.ico',
+  metadataBase: new URL(SITE_URL),
+  title: TITLE,
+  description: DESCRIPTION,
+  applicationName: 'Unwrapped',
+  openGraph: {
+    type: 'website',
+    url: SITE_URL,
+    siteName: 'Unwrapped',
+    title: TITLE,
+    description: DESCRIPTION,
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: TITLE,
+    description: DESCRIPTION,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#121212',
+  colorScheme: 'dark',
 };
 
 export default function RootLayout({
