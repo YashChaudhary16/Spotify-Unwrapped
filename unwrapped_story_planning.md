@@ -83,7 +83,7 @@ Goal: the "only you" moments. Each stat returns `null` when it isn't interesting
 
 **Done when:** each stat is computed and returns `null` correctly on thin years (e.g. the first, partial year of a history).
 
-### Step C — Listening personality ✅ (2026-11-12; waiting on the user's verdict on the labels)
+### Step C — Listening personality ✅ (2026-11-12; generic labels approved for now)
 Goal: a fun, shareable label built from rules that can be explained.
 - [x] `lib/personality.ts`: a list of archetypes, each with a rule, a score, a title, a one-line description and an icon (thresholds as built; score = value ÷ threshold):
   - **The Loyalist:** top artist ≥ 20% of the year's visible listening.
@@ -102,14 +102,14 @@ Goal: a fun, shareable label built from rules that can be explained.
 
 **Done when:** every eligible year gets a personality, and the user agrees the labels feel right for their own years.
 
-### Step D — Story player shell
+### Step D — Story player shell ✅ (2026-11-12; not yet viewed in a browser)
 Goal: the full-screen, tap-through player, with placeholder cards.
-- [ ] `components/story/StoryPlayer.tsx`: full-screen overlay (portal), dark backdrop, card at 9:16 on desktop (centered) and full screen on mobile.
-- [ ] Segmented progress bars at the top; auto-advance (~6–8 s per card, tunable per card).
-- [ ] Navigation: tap right/left half, ← → keys, swipe on touch; hold (or Space) to pause; Esc/✕ to close.
-- [ ] Hash routing `#story-<year>` so a story is linkable and Back closes it.
-- [ ] Accessibility: focus trap, `aria-live` announcement per card, visible pause/play button, everything works by keyboard; `prefers-reduced-motion` turns off auto-advance and big animations.
-- [ ] Preload the next card's artwork.
+- [x] `components/story/StoryPlayer.tsx`: full-screen overlay (portal), dark backdrop, card at 9:16 on desktop (centered) and full screen on mobile.
+- [x] Segmented progress bars at the top; auto-advance (~6–8 s per card, tunable per card).
+- [x] Navigation: tap right/left half, ← → keys, swipe on touch; hold (or Space) to pause; Esc/✕ to close.
+- [x] Hash routing `#story-<year>` so a story is linkable and Back closes it.
+- [x] Accessibility: focus trap, `aria-live` announcement per card, visible pause/play button, everything works by keyboard; `prefers-reduced-motion` turns off auto-advance and big animations.
+- [x] Preload the next card's artwork.
 
 **Done when:** placeholder cards can be stepped through by tap, keys and swipe, on mobile and desktop.
 
@@ -256,6 +256,9 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 - ~~**Step B/C:** Should ambient / sleep sounds count?~~ Answered 2026-11-12: counted in totals, never named (see Decisions).
 - **Step E:** Should the story also be offered for "All time" (a lifetime story), or wait for Step Q?
 
+## Ideas for later (not scheduled)
+- **More unique personality labels** (user, 2026-11-12): keep the generic ten for now, but later add more personal or surprising labels, e.g. ones built from the viewer's own artists, eras or quirks rather than one habit.
+
 ---
 
 ## Work Log
@@ -271,6 +274,37 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step D: story player shell
+**Done**
+- `components/story/StoryPlayer.tsx`, a full-screen dialog rendered in a portal:
+  - **Layout:** a 9:16 card centered on desktop (with ← → buttons beside it), full screen (`100dvh`, safe-area padding) on mobile.
+  - **Progress:** segmented bars at the top, filled with a CSS `story-progress` animation. The animation pauses through `animation-play-state`, and `onAnimationEnd` advances to the next card. Each card has its own `durationMs` (default 7 s), and the story stops on the last card.
+  - **Navigation:** tap the left third for back and the rest for next; swipe left/right; swipe down to close.
+  - **Pausing:** press and hold (250 ms) to pause; Space or the pause button toggles. It also pauses while the browser tab is hidden.
+  - **Keyboard:** ← → to move, Esc to close, Tab stays inside the dialog, and focus returns to where it was on close. Page scroll is locked while open.
+  - **Screen readers:** an `aria-live` line per card ("Card 3 of 6. Your top artist: …").
+  - **Reduced motion:** no auto-advance, no pause button, no entrance animation.
+  - Buttons and links inside cards (or anything marked `data-story-interactive`) don't trigger navigation.
+  - Preloads the next card's `preload` images.
+- `components/story/types.ts`: the `StoryCard` type (id, label, durationMs, background, preload, content).
+- `components/story/placeholderCards.tsx`: temporary cards from real story data (intro, total time, top artist, top songs, personality, summary) on neutral gradients. Step F replaces them.
+- Dashboard: opens the player when the URL hash is `#story-<year>` for an eligible year. Back or Esc closes it; a pasted link is replaced with the current tab on close. The button that pushes the history entry (so Back closes it) comes in Step E.
+- `app/globals.css`: `story-progress` and `story-card-in` keyframes.
+
+**How to try it now:** load data (or sample data), then add `#story-2024` to the URL.
+
+**Changed files**
+- New: `components/story/StoryPlayer.tsx`, `components/story/types.ts`, `components/story/placeholderCards.tsx`
+- Updated: `components/Dashboard.tsx`, `app/globals.css`
+
+**Notes / decisions**
+- The home page bundle went from 276 kB to 285 kB (story data, personality and player).
+- `tsc`, `next lint` and `next build` pass. **Not viewed in a browser** (no browser available here). Tap zones, hold-to-pause and swipe need a check on a phone and a laptop.
+- The user approved the generic personality labels for now; more unique labels were added to "Ideas for later".
+
+**Next**
+- Step E: entry point ("Play your {year} story" button, year picker, "Leave out of story" panel, cache warm-up).
 
 ### 2026-11-12 — Step C: listening personality
 **Done**

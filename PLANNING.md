@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step D (player shell)
+- New `components/story/` (StoryPlayer, card type, placeholder cards). The dashboard opens a story at `#story-<year>`. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Step C (personality)
 - New `lib/personality.ts` (ten archetypes plus an All-Rounder) and `stats.habits` in `lib/story.ts`; `buildStory` returns `personality`. Details are in `unwrapped_story_planning.md` → Work Log.
 

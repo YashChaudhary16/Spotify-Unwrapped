@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Disc3, LayoutDashboard, ListMusic, MicVocal, ShieldCheck, Sun, Upload, type LucideIcon } from 'lucide-react';
 import { ProcessedRecord } from '@/lib/preprocessing';
 import { ImportResult } from '@/lib/parseFiles';
@@ -25,6 +25,9 @@ import MonthlyWeekdayCharts from './MonthlyWeekdayCharts';
 import ArtistAnalytics from './ArtistAnalytics';
 import ArtistPicker from './ArtistPicker';
 import AlbumAnalytics from './AlbumAnalytics';
+import { buildStory, storyYears } from '@/lib/story';
+import { StoryPlayer } from './story/StoryPlayer';
+import { buildPlaceholderCards } from './story/placeholderCards';
 
 interface DashboardProps {
   data: ProcessedRecord[];
@@ -76,6 +79,45 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     }
     window.scrollTo({ top: 0 });
   }, []);
+
+  // Story mode: open at #story-<year> (linkable; Back closes it). The "Play your story" button comes in Step E.
+  const eligibleStoryYears = useMemo(() => storyYears(data).filter(y => y.eligible).map(y => y.year), [data]);
+  const [storyYear, setStoryYear] = useState<number | null>(null);
+  /** True when we pushed the #story entry ourselves (Step E's button will), so closing can go Back. */
+  const pushedStory = useRef(false);
+
+  useEffect(() => {
+    const sync = () => {
+      const match = window.location.hash.match(/^#story-(\d{4})$/);
+      const year = match ? Number(match[1]) : null;
+      if (year === null) pushedStory.current = false;
+      setStoryYear(year !== null && eligibleStoryYears.includes(year) ? year : null);
+    };
+    sync();
+    window.addEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+    return () => {
+      window.removeEventListener('hashchange', sync);
+      window.removeEventListener('popstate', sync);
+    };
+  }, [eligibleStoryYears]);
+
+  const closeStory = useCallback(() => {
+    if (pushedStory.current) {
+      window.history.back(); // the popstate listener clears storyYear
+      return;
+    }
+    // Opened from a pasted #story link: replace it with the current tab instead of leaving the site.
+    try {
+      window.history.replaceState(null, '', `#${tab}`);
+    } catch {
+      /* ignore */
+    }
+    setStoryYear(null);
+  }, [tab]);
+
+  const story = useMemo(() => (storyYear !== null ? buildStory(data, storyYear) : null), [data, storyYear]);
+  const storyCards = useMemo(() => (story ? buildPlaceholderCards(story, unit) : []), [story, unit]);
 
   const availableYears = useMemo(
     () => Array.from(new Set(data.map(r => r.Year))).sort((a, b) => b - a),
@@ -339,6 +381,10 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
           </p>
         </div>
       </div>
+
+      {story && storyCards.length > 0 && (
+        <StoryPlayer key={story.year} title={`Your ${story.year} story`} cards={storyCards} onClose={closeStory} />
+      )}
     </main>
   );
 }

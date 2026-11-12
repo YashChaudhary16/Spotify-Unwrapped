@@ -39,3 +39,14 @@ input {
   outline: 2px solid var(--spotify-green);
   outline-offset: 2px;
 }
+
+/* Story mode (components/story): progress-bar fill and card entrance. */
+@keyframes story-progress {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes story-card-in {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
