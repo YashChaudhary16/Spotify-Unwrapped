@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step A (data layer)
+- Added `lib/story.ts` (`buildStory`, `storyYears`, `isStoryEligible`). Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — New plan: Unwrapped Story + "Wrapped Can't Do"
 - Created `unwrapped_story_planning.md` with the next body of work: story mode (Steps A–K), "Wrapped Can't Do" features (L–R) and showcase (S–V). Its Work Log tracks that work; this log gets a one-line pointer per session.
 

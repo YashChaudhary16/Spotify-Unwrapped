@@ -53,15 +53,15 @@ From `ProcessedRecord` (`lib/preprocessing.ts`), music only, deduplicated:
 
 ## Part 1 — "Your Unwrapped Story"
 
-### Step A — Story data layer
+### Step A — Story data layer ✅ (2026-11-12)
 Goal: one pure function that turns a year of records into everything the story needs, with no UI.
-- [ ] `lib/story.ts`: `buildStory(records, year, allRecords) → StoryData` (pure, no React). `allRecords` is for comparisons with earlier years.
-- [ ] Core numbers: total listening time and a relatable equivalent ("that's 53 days straight", "≈ 640 flights from Delhi to Mumbai" style; keep a small list of equivalents), active days, unique tracks/artists.
-- [ ] Top artist (time, share, play count) with `trackId` of their top song (for artwork via `/api/spotify/artist`).
-- [ ] Top 5 tracks and top album, each with a `trackId` for cover art.
-- [ ] `isStoryEligible(records, year)` using the minimum-data rule.
-- [ ] Reuse helpers from `lib/analytics.ts` instead of duplicating them; extract shared bits if needed.
-- [ ] Check timings with the largest real history (target: under 150 ms per year on a laptop) and with sample data.
+- [x] `lib/story.ts`: `buildStory(records, year) → StoryData | null` (pure, no React). It takes the **full** history and filters to the year itself, so later steps can compare with earlier years without a second parameter.
+- [x] Core numbers: total listening time and a relatable equivalent ("that's 53 days straight", "≈ 640 flights from Delhi to Mumbai" style; keep a small list of equivalents), active days, unique tracks/artists.
+- [x] Top artist (time, share, play count) with `trackId` of their top song (for artwork via `/api/spotify/artist`).
+- [x] Top 5 tracks and top album, each with a `trackId` for cover art.
+- [x] `isStoryEligible(records, year)` and `storyYears(records)` (per-year totals plus eligibility, for Step E) using the minimum-data rule.
+- [x] ~~Reuse helpers from `lib/analytics.ts`~~: it has no reusable helpers (one big `calculateAnalytics`), so `story.ts` does its own single pass. It keys songs by **name + artist** (analytics uses name only).
+- [x] Check timings with the largest real history (target: under 150 ms per year on a laptop) and with sample data.
 
 **Done when:** `buildStory` returns sensible values for every year of the sample data and the user's real data (checked by logging, not UI).
 
@@ -242,6 +242,7 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 - **Step D/H:** Is the bold story palette OK inside story mode?
 - **Step H:** Background song previews in the story: yes or no?
 - **Step B/C:** Any archetypes or stats to add or drop after seeing them on real data?
+- **Step B/C:** Should ambient / sleep sounds (rain, nature tracks) count? On the user's real data, "Nature Therapy" is the 2025 top artist and rain sounds are a 2024 top-5 song. Options: count everything (honest), or offer a "leave out sleep/ambient sounds" toggle (needs a way to detect them, e.g. a user-picked list of artists).
 - **Step E:** Should the story also be offered for "All time" (a lifetime story), or wait for Step Q?
 
 ---
@@ -259,6 +260,29 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step A: story data layer
+**Done**
+- New `lib/story.ts` (pure, no React):
+  - `buildStory(records, year)`: year totals (time, plays, active days, unique tracks/artists), first/last date and a `partialYear` flag, relatable equivalents (days straight, films, nights of sleep, marathons), first song, top artist (share, plays, top song), top 5 songs and top album, each with a Spotify ID for artwork.
+  - `storyYears(records)` and `isStoryEligible(records, year)`, using the minimum-data rule (≥ 10 hours and ≥ 30 active days).
+- Songs are keyed by **name + artist**. When a song has several Spotify IDs (re-releases, relinking), the **most recently played ID** is used, because older IDs are the ones that tend to become "Not playable here".
+- `partialYear` means more than two weeks are missing at either end, so an export that ends on Dec 22 still counts as a full year.
+
+**Checked** (a local script in the scratchpad; nothing committed, nothing sent anywhere)
+- Sample data: 2023 and 2024 both eligible, with sensible top lists.
+- The user's real history (279k plays, 2019–2025): every year is eligible. 2019 is correctly partial (starts Mar 8). Top artists by year: Ludwig Göransson, Billie Eilish ×2, Ramin Djawadi ×2, Hans Zimmer, Nature Therapy.
+- `buildStory` takes **25–63 ms per year** on 279k records (target was under 150 ms). Preprocessing the whole history takes about 3.7 s in Node.
+
+**Changed files**
+- New: `lib/story.ts`
+
+**Notes / decisions**
+- New open question: whether ambient/sleep sounds should count (see Open questions).
+- `tsc`, `next lint` and `next build` pass. No UI yet.
+
+**Next**
+- Step B: extra story stats.
 
 ### 2026-11-12 — Plan created
 **Done**
