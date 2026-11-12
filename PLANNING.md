@@ -132,6 +132,20 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-10 — Albums tab: cover-color cards + cover art in the album header
+**Done**
+- **Top-album cards** (`AlbumCard` in `components/AlbumAnalytics.tsx`): each card's background is a 135° gradient from its **cover's dominant color** to the card color (via `useSpotifyArtwork`, fading in once loaded). Secondary text is `white/80` (≥ 4.5:1 on the tint; the usual `#B3B3B3` would be about 3.7:1), and the depth pill is `bg-black/30`. The selected card has a green border plus ring, and hover adds a faint lift.
+- **Selected album header**: a rounded-square cover (96px, 112px on desktop, `rounded-lg`, drop shadow) in front of the album name and artist. A disc-icon tile shows while loading (pulsing) or when there's no Spotify ID (sample data).
+- `AlbumStat` gained `coverTrackId`: the first Spotify track ID seen for that album. Every track on an album shares the cover, so one is enough.
+- Covers and colors are cached per track in `useSpotifyArtwork`, so the selected album's cover reuses its card's lookup.
+
+**Changed files**
+- Updated: `lib/analytics.ts`, `components/AlbumAnalytics.tsx`
+
+**Notes / decisions**
+- Each visit to the Albums tab makes up to 8 oEmbed requests (one per top album, cached afterwards); only track IDs go to Spotify.
+- `tsc`, `next lint` and `next build` pass. Not viewed in a browser here.
+
 ### 2026-11-10 — Artist banner: free-licensed photos from Wikimedia Commons
 **Done**
 - User feedback: the round profile photo is good, but the same photo stretched as the banner wasn't appealing. **The profile-photo banner is removed.**

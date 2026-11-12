@@ -25,6 +25,7 @@ import { SimpleBarChart } from '@/components/charts/SimpleBarChart';
 import { TrendChart } from '@/components/charts/TrendChart';
 import { Heatmap } from '@/components/charts/Heatmap';
 import { SearchOption, SearchSelect } from '@/components/ui/SearchSelect';
+import { useSpotifyArtwork } from '@/lib/useSpotifyArtwork';
 
 interface AlbumAnalyticsProps {
   albums: AlbumStat[];
@@ -70,6 +71,7 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
     () => (hasAlbums ? (albums.find(a => a.key === selectedAlbumKey) || albums[0]) : null),
     [albums, selectedAlbumKey, hasAlbums]
   );
+  const selectedArtwork = useSpotifyArtwork(selectedAlbum?.coverTrackId ?? null);
   const comparisonAlbum = useMemo(
     () => (hasAlbums ? albums.find(a => a.key === comparisonKey) : null),
     [albums, comparisonKey, hasAlbums]
@@ -133,38 +135,42 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
       {/* Top Albums selector */}
       <div className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         {topAlbums.map((album, idx) => (
-          <button
+          <AlbumCard
             key={album.key}
-            onClick={() => setSelectedAlbumKey(album.key)}
-            className={`rounded-xl border p-4 text-left transition-colors ${
-              album.key === selectedAlbumKey
-                ? 'border-spotify-green bg-spotify-highlight'
-                : 'border-spotify-border bg-spotify-dark hover:bg-spotify-highlight'
-            }`}
-          >
-            <div className="mb-2 flex items-center justify-between">
-              <div className="text-sm font-semibold tabular-nums text-spotify-lightgray">#{idx + 1}</div>
-              <div className="rounded-full bg-spotify-gray px-2 py-1 text-xs text-spotify-lightgray">
-                {depthLabel(album.depthScore)}
-              </div>
-            </div>
-            <div className="truncate text-lg font-semibold text-white">{album.album}</div>
-            <div className="mb-2 truncate text-sm text-spotify-lightgray">{album.artist}</div>
-            <div className="flex gap-3 text-sm tabular-nums">
-              <span className="font-semibold text-white">{formatDuration(album.hours, unit)}</span>
-              <span className="text-spotify-lightgray">{formatNumber(album.plays)} plays</span>
-              <span className="text-spotify-lightgray">{album.uniqueTracks} tracks</span>
-            </div>
-          </button>
+            album={album}
+            rank={idx + 1}
+            selected={album.key === selectedAlbumKey}
+            onSelect={() => setSelectedAlbumKey(album.key)}
+          />
         ))}
       </div>
 
       {/* Selected album detail */}
       <Card className="mb-10">
         <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-white">{selectedAlbum.album}</h3>
-            <p className="text-spotify-lightgray">{selectedAlbum.artist}</p>
+          <div className="flex min-w-0 items-center gap-5">
+            {/* Album cover (rounded square), placeholder tile when there's no Spotify ID or while loading */}
+            <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-spotify-gray shadow-xl shadow-black/50 md:h-28 md:w-28">
+              {selectedArtwork ? (
+                // eslint-disable-next-line @next/next/no-img-element -- remote Spotify CDN image
+                <img
+                  src={selectedArtwork.imageUrl}
+                  alt={`Cover of ${selectedAlbum.album}`}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center">
+                  <Disc3
+                    className={`h-10 w-10 text-spotify-muted ${selectedAlbum.coverTrackId ? 'animate-pulse' : ''}`}
+                    aria-hidden
+                  />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-2xl font-bold text-white">{selectedAlbum.album}</h3>
+              <p className="text-spotify-lightgray">{selectedAlbum.artist}</p>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <StatPill label="Total time" value={formatDuration(selectedAlbum.hours, unit)} />
@@ -364,6 +370,61 @@ export default function AlbumAnalytics({ albums, artistCoverage }: AlbumAnalytic
         )}
       </Card>
     </Section>
+  );
+}
+
+/** Top-album selector card with a background gradient from its cover's dominant color. */
+function AlbumCard({
+  album,
+  rank,
+  selected,
+  onSelect,
+}: {
+  album: AlbumStat;
+  rank: number;
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const { unit } = useTimeUnit();
+  const artwork = useSpotifyArtwork(album.coverTrackId);
+
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      className={`group relative overflow-hidden rounded-xl border bg-spotify-dark p-4 text-left transition-colors ${
+        selected ? 'border-spotify-green ring-1 ring-spotify-green' : 'border-spotify-border hover:border-white/25'
+      }`}
+    >
+      {/* Cover-color gradient (fades in once the color is known). */}
+      <span
+        className="pointer-events-none absolute inset-0 transition-opacity duration-700"
+        style={{
+          backgroundImage: artwork
+            ? `linear-gradient(135deg, ${artwork.color} 0%, rgba(24, 24, 24, 0.55) 70%, #181818 100%)`
+            : undefined,
+          opacity: artwork ? 1 : 0,
+        }}
+        aria-hidden
+      />
+      {/* Hover lift */}
+      <span className="pointer-events-none absolute inset-0 bg-white/0 transition-colors group-hover:bg-white/[0.04]" aria-hidden />
+
+      <span className="relative block">
+        <span className="mb-2 flex items-center justify-between">
+          <span className="text-sm font-semibold tabular-nums text-white/80">#{rank}</span>
+          <span className="rounded-full bg-black/30 px-2 py-1 text-xs text-white/85">{depthLabel(album.depthScore)}</span>
+        </span>
+        <span className="block truncate text-lg font-semibold text-white">{album.album}</span>
+        <span className="mb-2 block truncate text-sm text-white/80">{album.artist}</span>
+        <span className="flex gap-3 text-sm tabular-nums">
+          <span className="font-semibold text-white">{formatDuration(album.hours, unit)}</span>
+          <span className="text-white/80">{formatNumber(album.plays)} plays</span>
+          <span className="text-white/80">{album.uniqueTracks} tracks</span>
+        </span>
+      </span>
+    </button>
   );
 }
 

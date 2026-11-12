@@ -19,6 +19,8 @@ export interface AlbumStat {
   mostPlayedTrack: { track: string | null; hours: number; plays: number };
   firstListen: string;
   lastListen: string;
+  /** Any Spotify track ID from this album — used to look up its cover art (all tracks share it). */
+  coverTrackId: string | null;
   timeSeries: { date: string; hours: number }[];
   timeOfDay: { bucket: string; hours: number }[];
   heatmapData: { month: string; weekday: string; hours: number }[];
@@ -360,6 +362,7 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
     heatmapMap: Map<string, number>;
     firstListen: string;
     lastListen: string;
+    coverTrackId: string | null;
   }>();
 
   validRecords.forEach(r => {
@@ -379,10 +382,12 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
         heatmapMap: new Map(),
         firstListen: r.date,
         lastListen: r.date,
+        coverTrackId: null,
       });
     }
 
     const entry = albumMap.get(key)!;
+    if (!entry.coverTrackId && r.track_id) entry.coverTrackId = r.track_id;
     entry.hours += r.hours;
     entry.plays += 1;
 
@@ -453,6 +458,7 @@ export const calculateAnalytics = (records: ProcessedRecord[]): Analytics => {
       },
       firstListen: entry.firstListen,
       lastListen: entry.lastListen,
+      coverTrackId: entry.coverTrackId,
       timeSeries,
       timeOfDay,
       heatmapData: heatmapDataForAlbum,
