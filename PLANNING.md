@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step E (entry point, "Leave out of story")
+- Overview banner with "Play your {year} story" and year chips; "Leave out of story" panel saved in this browser; idle cache warm-up. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Step D (player shell)
 - New `components/story/` (StoryPlayer, card type, placeholder cards). The dashboard opens a story at `#story-<year>`. Details are in `unwrapped_story_planning.md` → Work Log.
 

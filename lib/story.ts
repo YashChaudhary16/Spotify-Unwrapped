@@ -211,6 +211,9 @@ export interface StoryOptions {
   hiddenArtists?: Iterable<string>;
   /** Songs the viewer chose to leave out, as `storyTrackKey(track, artist)`. */
   hiddenTracks?: Iterable<string>;
+  /** Auto-detected ambient artists / songs the viewer put back into the story. */
+  shownArtists?: Iterable<string>;
+  shownTracks?: Iterable<string>;
 }
 
 export interface StoryYear {
@@ -393,25 +396,83 @@ const toStoryTrack = (t: TrackAcc): StoryTrack => ({
   plays: t.plays,
 });
 
+export interface HideCandidate {
+  /** Artist name, or `storyTrackKey` for a song. */
+  key: string;
+  name: string;
+  /** The song's artist (songs only). */
+  artist?: string | null;
+  hours: number;
+}
+
+export interface StoryHideCandidates {
+  /** Auto-detected ambient artists and songs with listening this year, most listened first. */
+  autoArtists: HideCandidate[];
+  autoTracks: HideCandidate[];
+  /** Every artist and song played this year (not in private sessions), for the "hide" search. */
+  artists: HideCandidate[];
+  tracks: HideCandidate[];
+}
+
+/**
+ * What the "Leave out of story" panel lists for `year`. Ignores the viewer's choices, so the panel can show
+ * every auto-detected item with a checkbox.
+ */
+export function storyHideCandidates(records: ProcessedRecord[], year: number): StoryHideCandidates {
+  const ambient = detectAmbient(records);
+  const artists = new Map<string, number>();
+  const tracks = new Map<string, HideCandidate>();
+  for (const r of records) {
+    if (r.Year !== year || !(r.hours > 0) || r.incognito_mode) continue;
+    const artist = r.master_metadata_album_artist_name;
+    const name = r.master_metadata_track_name;
+    if (artist) artists.set(artist, (artists.get(artist) ?? 0) + r.hours);
+    if (name) {
+      const key = trackKey(name, artist);
+      const t = tracks.get(key) ?? { key, name, artist, hours: 0 };
+      t.hours += r.hours;
+      tracks.set(key, t);
+    }
+  }
+  const artistList = Array.from(artists.entries())
+    .map(([name, hours]) => ({ key: name, name, hours }))
+    .sort((a, b) => b.hours - a.hours);
+  const trackList = Array.from(tracks.values()).sort((a, b) => b.hours - a.hours);
+  return {
+    autoArtists: artistList.filter(a => ambient.artists.has(a.name)),
+    autoTracks: trackList.filter(
+      t => ambient.tracks.has(t.key) && !(t.artist && ambient.artists.has(t.artist))
+    ),
+    artists: artistList,
+    tracks: trackList,
+  };
+}
+
 /** Why a play is counted in the totals but not shown by name, or null if the story may show it. */
 type Hidden = 'private' | 'ambient' | null;
 
 const optionsKey = (o: StoryOptions) =>
-  JSON.stringify([Array.from(o.hiddenArtists ?? []).sort(), Array.from(o.hiddenTracks ?? []).sort()]);
+  JSON.stringify(
+    [o.hiddenArtists, o.hiddenTracks, o.shownArtists, o.shownTracks].map(list => Array.from(list ?? []).sort())
+  );
 
 function visibility(records: ProcessedRecord[], options: StoryOptions): (r: ProcessedRecord) => Hidden {
   const ambient = detectAmbient(records);
   const hiddenArtists = new Set(options.hiddenArtists ?? []);
   const hiddenTracks = new Set(options.hiddenTracks ?? []);
+  const shownArtists = new Set(options.shownArtists ?? []);
+  const shownTracks = new Set(options.shownTracks ?? []);
   return r => {
     if (r.incognito_mode) return 'private';
     const name = r.master_metadata_track_name;
     const artist = r.master_metadata_album_artist_name;
-    if (artist !== null && (ambient.artists.has(artist) || hiddenArtists.has(artist))) return 'ambient';
-    if (name !== null) {
-      const key = trackKey(name, artist);
-      if (ambient.tracks.has(key) || hiddenTracks.has(key)) return 'ambient';
-    }
+    const key = name !== null ? trackKey(name, artist) : null;
+    // The viewer's own choices win over auto-detection.
+    if ((artist !== null && hiddenArtists.has(artist)) || (key !== null && hiddenTracks.has(key))) return 'ambient';
+    // Putting an artist back also puts back their songs that match on their own.
+    if ((key !== null && shownTracks.has(key)) || (artist !== null && shownArtists.has(artist))) return null;
+    if (artist !== null && ambient.artists.has(artist)) return 'ambient';
+    if (key !== null && ambient.tracks.has(key)) return 'ambient';
     return null;
   };
 }

@@ -113,22 +113,23 @@ Goal: the full-screen, tap-through player, with placeholder cards.
 
 **Done when:** placeholder cards can be stepped through by tap, keys and swipe, on mobile and desktop.
 
-### Step E — Entry point
-- [ ] "Play your {year} story" hero button on Overview, for the latest eligible year, with a small year picker for the others.
-- [ ] When a single year is selected in the header filter, the button uses that year.
-- [ ] Ineligible years are hidden (or disabled with "Not enough listening in {year}").
-- [ ] Warm the story cache when the dashboard is idle (`requestIdleCallback`), so the first story opens instantly. The first `buildStory` call builds the shared index (~360 ms on 279k plays in Node; slower on phones), and later years take ~55–90 ms. If it's still slow on phones, move it into the Web Worker.
-- [ ] **"Leave out of story" panel**, opened before the story starts and from a small ⋯ menu on artist/song cards:
+### Step E — Entry point ✅ (2026-11-12; not yet viewed in a browser)
+- [x] "Play your {year} story" hero button on Overview, for the latest eligible year, with a small year picker for the others.
+- [x] When a single year is selected in the header filter, the button uses that year.
+- [x] Ineligible years are hidden (or disabled with "Not enough listening in {year}"). Hidden, and the banner disappears if no year qualifies.
+- [x] Warm the story cache when the dashboard is idle (`requestIdleCallback`), so the first story opens instantly. The first `buildStory` call builds the shared index (~360 ms on 279k plays in Node; slower on phones), and later years take ~55–90 ms. If it's still slow on phones, move it into the Web Worker.
+- [x] **"Leave out of story" panel**, opened from the banner ("Leave out…", then "Play your {year} story") and from an eye-off button in the player's top bar. The **⋯ menu on artist/song cards moves to Step F**, since it needs the designed cards:
   - Lists the auto-detected sleep/ambient artists that appear in this year (with their time), each with a checkbox to put it back.
   - "Added by you": artists or songs the viewer hid, with ✕ to remove; a search (reuse `SearchSelect`) to add any artist or song.
   - Note: "Hidden listening still counts toward your total time."
-  - Saved in `localStorage` (per browser, wrapped in try/catch) and passed to `buildStory` as `StoryOptions` (`hiddenArtists`, `hiddenTracks`). Unticking an auto-detected artist needs a matching "shownArtists" option (add it to `StoryOptions` then).
+  - Saved in `localStorage` (per browser, wrapped in try/catch) and passed to `buildStory` as `StoryOptions` (`hiddenArtists`, `hiddenTracks`, plus `shownArtists`/`shownTracks` for auto-detected items the viewer puts back).
   - Example it must handle: "Nature Therapy" (218 hrs in 2025) has no telltale words, so only the viewer can hide it.
 
 **Done when:** the user can open a story for any eligible year from the dashboard.
 
 ### Step F — Card set v1 (the core story)
 Goal: a complete, short story.
+- [ ] A small ⋯ menu on the top-artist and top-song cards with "Leave out of story" (moved from Step E). It hides that item through `useStoryHidden` and the story recomputes; the player already keeps the card index in range when cards drop out.
 1. [ ] **Intro:** "{year}, unwrapped." Includes the year's first song.
 2. [ ] **Total time:** a big counting-up number in the selected time unit (`formatDuration`), plus the equivalent.
 3. [ ] **Top artist:** photo and Spotify artist colors (`useSpotifyArtist`), time and share.
@@ -274,6 +275,43 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step E: entry point and "Leave out of story"
+**Done**
+- **Banner** `components/story/StoryHero.tsx`, at the top of Overview:
+  - "{year}, unwrapped." with chips for every story year (hidden years aren't offered).
+  - A white "Play your {year} story" button and a "Leave out…" button.
+  - It defaults to the single year picked in the header filter, otherwise the newest story year.
+  - The play button is white, not green, to keep green for data and active state.
+- The Play button **pushes `#story-<year>`**, so browser Back closes the story.
+- **Panel** `components/story/LeaveOutPanel.tsx`: a bottom sheet on mobile, a centered dialog on desktop.
+  - Search any artist or song played that year to leave it out (reuses `SearchSelect`; up to 3,000 songs offered).
+  - "Left out by you" rows with ✕ to put each back.
+  - "Sleep and ambient sounds found in {year}": checkboxes, 6 shown first, then "Show all N".
+  - Copy: hidden listening still counts toward total time; private sessions are always left out; choices are saved in this browser and apply to every year.
+  - Opened from the banner, its main button is "Play your {year} story". Opened from the player (new eye-off button in the top bar), the story pauses and ignores keys until the panel closes.
+- `lib/useStoryHidden.ts`: the choices in `localStorage` (`unwrapped.story.leaveOut.v1`), every read/write guarded.
+- `lib/story.ts`:
+  - `StoryOptions` gains `shownArtists`/`shownTracks`. The viewer's choices beat auto-detection, and putting an artist back also brings back their individually flagged songs. That was a bug caught in testing: "Nature Sounds" stayed hidden.
+  - New `storyHideCandidates(records, year)` feeds the panel (~120 ms on 2025).
+- **Warm-up:** the dashboard builds the newest story in `requestIdleCallback` (with a `setTimeout` fallback), so the shared caches are ready before Play.
+
+**Checked on the user's real history (2025)**
+- The panel would list 250 auto-detected artists and 45 single songs (top: Nature Sounds 90.9 hrs, White Noise Radiance, Pure Sleeping Vibes, Sleepy John, Literrain, Edy Boman).
+- Hiding Nature Therapy makes Emile Mosseri the top artist.
+- Putting Nature Sounds back returns 90.9 hrs to the story; the total stays 2,982.5 hrs.
+
+**Changed files**
+- New: `components/story/StoryHero.tsx`, `components/story/LeaveOutPanel.tsx`, `lib/useStoryHidden.ts`
+- Updated: `lib/story.ts`, `components/story/StoryPlayer.tsx`, `components/Dashboard.tsx`
+
+**Notes / decisions**
+- The ⋯ "Leave out" menu on artist/song cards moved to Step F (needs the designed cards).
+- The home page bundle went from 285 kB to 288 kB.
+- `tsc`, `next lint` and `next build` pass. **Not viewed in a browser** (none available here).
+
+**Next**
+- Step F: the designed card set v1.
 
 ### 2026-11-12 — Step D: story player shell
 **Done**

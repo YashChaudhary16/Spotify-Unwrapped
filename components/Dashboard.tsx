@@ -25,8 +25,11 @@ import MonthlyWeekdayCharts from './MonthlyWeekdayCharts';
 import ArtistAnalytics from './ArtistAnalytics';
 import ArtistPicker from './ArtistPicker';
 import AlbumAnalytics from './AlbumAnalytics';
-import { buildStory, storyYears } from '@/lib/story';
+import { buildStory, storyHideCandidates, storyYears } from '@/lib/story';
+import { useStoryHidden } from '@/lib/useStoryHidden';
 import { StoryPlayer } from './story/StoryPlayer';
+import { StoryHero } from './story/StoryHero';
+import { LeaveOutPanel } from './story/LeaveOutPanel';
 import { buildPlaceholderCards } from './story/placeholderCards';
 
 interface DashboardProps {
@@ -80,11 +83,14 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     window.scrollTo({ top: 0 });
   }, []);
 
-  // Story mode: open at #story-<year> (linkable; Back closes it). The "Play your story" button comes in Step E.
+  // Story mode: opened by the Overview banner or a #story-<year> link (Back closes it).
   const eligibleStoryYears = useMemo(() => storyYears(data).filter(y => y.eligible).map(y => y.year), [data]);
   const [storyYear, setStoryYear] = useState<number | null>(null);
-  /** True when we pushed the #story entry ourselves (Step E's button will), so closing can go Back. */
+  /** True when we pushed the #story entry ourselves, so closing can go Back. */
   const pushedStory = useRef(false);
+  const { state: storyHidden, options: storyOptions, setArtistHidden, setTrackHidden } = useStoryHidden();
+  /** "Leave out of story" panel: which year it lists, and whether it was opened before playing (from the banner). */
+  const [leaveOut, setLeaveOut] = useState<{ year: number; beforePlay: boolean } | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -102,6 +108,16 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     };
   }, [eligibleStoryYears]);
 
+  const openStory = useCallback((year: number) => {
+    try {
+      window.history.pushState(null, '', `#story-${year}`);
+      pushedStory.current = true;
+    } catch {
+      /* ignore */
+    }
+    setStoryYear(year);
+  }, []);
+
   const closeStory = useCallback(() => {
     if (pushedStory.current) {
       window.history.back(); // the popstate listener clears storyYear
@@ -116,8 +132,35 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     setStoryYear(null);
   }, [tab]);
 
-  const story = useMemo(() => (storyYear !== null ? buildStory(data, storyYear) : null), [data, storyYear]);
+  const story = useMemo(
+    () => (storyYear !== null ? buildStory(data, storyYear, storyOptions) : null),
+    [data, storyYear, storyOptions]
+  );
   const storyCards = useMemo(() => (story ? buildPlaceholderCards(story, unit) : []), [story, unit]);
+  const hideCandidates = useMemo(
+    () => (leaveOut ? storyHideCandidates(data, leaveOut.year) : null),
+    [data, leaveOut]
+  );
+
+  // Warm the story caches (ambient detection + history index, ~0.4 s on a big history) while the dashboard
+  // is idle, so pressing Play opens instantly.
+  useEffect(() => {
+    const latest = eligibleStoryYears[0];
+    if (latest === undefined) return;
+    const warm = () => buildStory(data, latest, storyOptions);
+    if (typeof window.requestIdleCallback === 'function') {
+      const id = window.requestIdleCallback(warm, { timeout: 5000 });
+      return () => window.cancelIdleCallback(id);
+    }
+    const id = window.setTimeout(warm, 1500);
+    return () => window.clearTimeout(id);
+  }, [data, eligibleStoryYears, storyOptions]);
+
+  // The banner offers the single year picked in the header filter, otherwise the newest story year.
+  const heroYear =
+    selectedYears.length === 1 && eligibleStoryYears.includes(selectedYears[0])
+      ? selectedYears[0]
+      : eligibleStoryYears[0];
 
   const availableYears = useMemo(
     () => Array.from(new Set(data.map(r => r.Year))).sort((a, b) => b - a),
@@ -309,6 +352,14 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
 
         {hasListening && tab === 'overview' && (
           <>
+            {heroYear !== undefined && (
+              <StoryHero
+                years={eligibleStoryYears}
+                defaultYear={heroYear}
+                onPlay={openStory}
+                onLeaveOut={year => setLeaveOut({ year, beforePlay: true })}
+              />
+            )}
             <Metrics analytics={analytics} />
             <TimeSeriesChart data={analytics.timeSeries} />
             <StreaksMilestones
@@ -383,7 +434,34 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
       </div>
 
       {story && storyCards.length > 0 && (
-        <StoryPlayer key={story.year} title={`Your ${story.year} story`} cards={storyCards} onClose={closeStory} />
+        <StoryPlayer
+          key={story.year}
+          title={`Your ${story.year} story`}
+          cards={storyCards}
+          onClose={closeStory}
+          onLeaveOut={() => setLeaveOut({ year: story.year, beforePlay: false })}
+          suspended={leaveOut !== null}
+        />
+      )}
+
+      {leaveOut && hideCandidates && (
+        <LeaveOutPanel
+          year={leaveOut.year}
+          candidates={hideCandidates}
+          hidden={storyHidden}
+          setArtistHidden={setArtistHidden}
+          setTrackHidden={setTrackHidden}
+          unit={unit}
+          onClose={() => setLeaveOut(null)}
+          onPlay={
+            leaveOut.beforePlay
+              ? () => {
+                  setLeaveOut(null);
+                  openStory(leaveOut.year);
+                }
+              : undefined
+          }
+        />
       )}
     </main>
   );

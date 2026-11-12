@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, Pause, Play, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, EyeOff, Pause, Play, X } from 'lucide-react';
 import { DEFAULT_CARD_MS, type StoryCard } from './types';
 
 interface StoryPlayerProps {
@@ -10,6 +10,10 @@ interface StoryPlayerProps {
   title: string;
   cards: StoryCard[];
   onClose: () => void;
+  /** Opens the "Leave out of story" panel (shown as a button in the top bar). */
+  onLeaveOut?: () => void;
+  /** True while another dialog (the panel) is open on top: the story pauses and ignores keys. */
+  suspended?: boolean;
 }
 
 /** A press held this long pauses instead of navigating. */
@@ -44,7 +48,7 @@ const isInteractive = (target: EventTarget | null) =>
  * - Keyboard: ← → to move, Space to pause, Esc to close. Focus stays inside the dialog and returns on close.
  * - `prefers-reduced-motion`: no auto-advance and no entrance animation; the viewer moves at their own pace.
  */
-export function StoryPlayer({ title, cards, onClose }: StoryPlayerProps) {
+export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = false }: StoryPlayerProps) {
   const [index, setIndex] = useState(0);
   const [userPaused, setUserPaused] = useState(false);
   const [held, setHeld] = useState(false);
@@ -57,13 +61,19 @@ export function StoryPlayer({ title, cards, onClose }: StoryPlayerProps) {
   const count = cards.length;
   const card = cards[index];
   const isLast = index === count - 1;
-  const paused = userPaused || held || tabHidden;
+  const paused = userPaused || held || tabHidden || suspended;
 
   const next = useCallback(() => setIndex(i => Math.min(i + 1, count - 1)), [count]);
   const prev = useCallback(() => setIndex(i => Math.max(i - 1, 0)), []);
 
+  // The card list can shrink when something is left out; stay in range.
+  useEffect(() => {
+    if (index > count - 1) setIndex(Math.max(count - 1, 0));
+  }, [index, count]);
+
   // Keyboard
   useEffect(() => {
+    if (suspended) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -96,7 +106,7 @@ export function StoryPlayer({ title, cards, onClose }: StoryPlayerProps) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [next, prev, onClose]);
+  }, [next, prev, onClose, suspended]);
 
   // Focus the dialog on open, lock page scroll, and restore both on close.
   useEffect(() => {
@@ -236,6 +246,17 @@ export function StoryPlayer({ title, cards, onClose }: StoryPlayerProps) {
           <div className="mt-3 flex items-center justify-between gap-2">
             <span className="truncate text-sm font-semibold text-white/90">{title}</span>
             <div className="flex shrink-0 items-center gap-1">
+              {onLeaveOut && (
+                <button
+                  type="button"
+                  onClick={onLeaveOut}
+                  aria-label="Leave artists or songs out of the story"
+                  title="Leave out of story"
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-white transition-colors hover:bg-white/15"
+                >
+                  <EyeOff className="h-5 w-5" aria-hidden />
+                </button>
+              )}
               {!reducedMotion && (
                 <button
                   type="button"
