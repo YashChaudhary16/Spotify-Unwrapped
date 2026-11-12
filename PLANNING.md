@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step B (extra stats)
+- `lib/story.ts` gains `stats`: seasons, months, discoveries, longest session, repeat day, time of day, countries, year over year, loyalty, comeback, skips. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story: private sessions and ambient sounds left out
 - `lib/story.ts`: private-session plays and ambient/sleep sounds count in story totals but are never named; auto-detection plus a viewer hide list (UI in Step E). Details are in `unwrapped_story_planning.md` → Work Log.
 

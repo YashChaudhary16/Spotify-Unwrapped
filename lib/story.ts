@@ -1,3 +1,6 @@
+import { format } from 'date-fns';
+// @ts-ignore - world-countries has type resolution issues with Next.js (same as lib/preprocessing.ts)
+import countries from 'world-countries';
 import { ProcessedRecord } from './preprocessing';
 
 /**
@@ -10,6 +13,11 @@ import { ProcessedRecord } from './preprocessing';
  *   count toward the totals (time, plays, active days) but are never named or ranked in the story.
  * - Ambient sounds are found by `detectAmbient` (strict phrases, see `AMBIENT_PHRASES`), plus any artists
  *   or songs the viewer hides themselves (`StoryOptions`).
+ * - Only the **totals** include them. Every other stat (top lists, seasons, sessions, time of day, skips, …)
+ *   is built from the plays the story may show, so e.g. all-night rain sounds don't make someone a "Night Owl".
+ *
+ * Step B adds `StoryData.stats`: optional "only you" moments. Each one is null when it isn't interesting,
+ * so its card can be skipped instead of showing something weak.
  */
 
 /** Minimum listening for a year to get a story (Decisions → "Minimum data"; tune on real data). */
@@ -78,6 +86,86 @@ export interface StoryData {
   /** Top 5 songs by listening time. */
   topTracks: StoryTrack[];
   topAlbum: StoryAlbum | null;
+  /** Extra moments (Step B); each is null when there's nothing interesting to say. */
+  stats: StoryStats;
+}
+
+export type Season = 'winter' | 'spring' | 'summer' | 'autumn';
+
+export interface StorySeason {
+  season: Season;
+  /** Calendar months (1–12) in this season, within this calendar year. */
+  months: number[];
+  hours: number;
+  track: StoryTrack;
+}
+
+export interface StoryDiscovery {
+  name: string;
+  /** Rank among this year's artists (1-based). */
+  rank: number;
+  hours: number;
+  /** Date of the very first play of this artist (yyyy-MM-dd). */
+  firstPlayed: string;
+  topTrack: StoryTrack | null;
+}
+
+export interface StorySession {
+  /** Start date and local start/end times (yyyy-MM-dd, HH:mm). The end may be on the next day. */
+  date: string;
+  start: string;
+  end: string;
+  /** Time actually played, and the time from first start to last end. */
+  hours: number;
+  spanHours: number;
+  plays: number;
+  topTrack: StoryTrack | null;
+}
+
+export interface StoryStats {
+  /** Song of each season (northern or southern hemisphere, from where most listening happened). Needs 2+ seasons. */
+  seasons: StorySeason[] | null;
+  /** Song of each month with at least an hour of listening. */
+  months: { month: number; hours: number; track: StoryTrack }[] | null;
+  /** Artists first played this year who reached the year's top 20. Null in the history's first year. */
+  discoveries: StoryDiscovery[] | null;
+  /** Longest stretch of listening with no gap over 30 minutes. Needs 2+ hours. */
+  longestSession: StorySession | null;
+  /** Most plays (30 s or more each) of one song in a single day. Needs 5+. */
+  repeatDay: { date: string; plays: number; track: StoryTrack } | null;
+  timeOfDay: {
+    /** Listening hours per local hour of day (index 0–23). */
+    byHour: number[];
+    peakHour: number;
+    /** Share (0–1) of listening between 00:00–05:00 and 05:00–11:00. */
+    nightShare: number;
+    morningShare: number;
+  } | null;
+  /** Countries with at least an hour of listening, largest first. Needs 2+. */
+  countries: { country: string; hours: number }[] | null;
+  /** Total time vs the previous year (all listening on both sides). */
+  yearOverYear: {
+    previousYear: number;
+    previousHours: number;
+    /** Relative change, e.g. 0.18 = 18% more. */
+    change: number;
+    /** True if either year is partial, so the comparison is shaky (the UI may soften or skip it). */
+    partial: boolean;
+  } | null;
+  /** This year's #1 artist has been #1 for this many years in a row (2+). */
+  loyalty: { artist: string; years: number; since: number } | null;
+  /** A song from an earlier year's top 50, barely played the year before (under an hour), back in this year's top 50. */
+  comeback: {
+    track: StoryTrack;
+    /** This year's rank (1-based), and its best earlier year and rank. */
+    rank: number;
+    peakYear: number;
+    peakRank: number;
+    /** Hours played in the quiet year before this one (may be 0). */
+    quietYearHours: number;
+  } | null;
+  /** Share of plays skipped (`skipped` or ended with the next button), this year and over the whole history. Needs 100+ plays. */
+  skips: { rate: number; lifetimeRate: number; skipped: number; plays: number } | null;
 }
 
 /** What was counted in the totals but left out of everything that names a song, artist or album. */
@@ -169,6 +257,7 @@ const AMBIENT_PHRASES = new RegExp(
     'binaural',
     'cricket sounds?',
     'forest rain',
+    'rain ?forest',
     'rainforest sounds?',
     'ocean waves',
     'fan noise',
@@ -276,14 +365,390 @@ const toStoryTrack = (t: TrackAcc): StoryTrack => ({
   plays: t.plays,
 });
 
+/** Why a play is counted in the totals but not shown by name, or null if the story may show it. */
+type Hidden = 'private' | 'ambient' | null;
+
+const optionsKey = (o: StoryOptions) =>
+  JSON.stringify([Array.from(o.hiddenArtists ?? []).sort(), Array.from(o.hiddenTracks ?? []).sort()]);
+
+function visibility(records: ProcessedRecord[], options: StoryOptions): (r: ProcessedRecord) => Hidden {
+  const ambient = detectAmbient(records);
+  const hiddenArtists = new Set(options.hiddenArtists ?? []);
+  const hiddenTracks = new Set(options.hiddenTracks ?? []);
+  return r => {
+    if (r.incognito_mode) return 'private';
+    const name = r.master_metadata_track_name;
+    const artist = r.master_metadata_album_artist_name;
+    if (artist !== null && (ambient.artists.has(artist) || hiddenArtists.has(artist))) return 'ambient';
+    if (name !== null) {
+      const key = trackKey(name, artist);
+      if (ambient.tracks.has(key) || hiddenTracks.has(key)) return 'ambient';
+    }
+    return null;
+  };
+}
+
+const isSkip = (r: ProcessedRecord) => r.skipped || r.reason_end === 'fwdbtn';
+
+/** Per-year summaries of the whole history, for comparisons with earlier years. Cached per records + options. */
+interface HistoryIndex {
+  firstYear: number;
+  /** All listening per year (totals rule), plus first/last date for the partial-year check. */
+  years: Map<number, { hours: number; firstDate: string; lastDate: string }>;
+  /** Visible listening per year: artist → hours, track key → hours. */
+  artistHours: Map<number, Map<string, number>>;
+  trackHours: Map<number, Map<string, number>>;
+  /** Each year's #1 visible artist, and its top-50 songs as track key → rank (0-based). */
+  topArtist: Map<number, string>;
+  topTrackRanks: Map<number, Map<string, number>>;
+  /** Very first play of each artist (any play, hidden or not). */
+  artistFirst: Map<string, { year: number; date: string }>;
+  lifetimeSkips: { skipped: number; plays: number };
+}
+
+const indexCache = new WeakMap<ProcessedRecord[], Map<string, HistoryIndex>>();
+
+function historyIndex(records: ProcessedRecord[], options: StoryOptions): HistoryIndex {
+  const key = optionsKey(options);
+  let perRecords = indexCache.get(records);
+  const cached = perRecords?.get(key);
+  if (cached) return cached;
+
+  const hidden = visibility(records, options);
+  const index: HistoryIndex = {
+    firstYear: Infinity,
+    years: new Map(),
+    artistHours: new Map(),
+    trackHours: new Map(),
+    topArtist: new Map(),
+    topTrackRanks: new Map(),
+    artistFirst: new Map(),
+    lifetimeSkips: { skipped: 0, plays: 0 },
+  };
+  const bump = <K>(m: Map<K, number>, k: K, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+
+  for (const r of records) {
+    if (!(r.hours > 0)) continue;
+    const y = r.Year;
+    if (y < index.firstYear) index.firstYear = y;
+    const yr = index.years.get(y) ?? { hours: 0, firstDate: r.date, lastDate: r.date };
+    yr.hours += r.hours;
+    if (r.date < yr.firstDate) yr.firstDate = r.date;
+    if (r.date > yr.lastDate) yr.lastDate = r.date;
+    index.years.set(y, yr);
+
+    const artist = r.master_metadata_album_artist_name;
+    const name = r.master_metadata_track_name;
+    if (artist) {
+      const f = index.artistFirst.get(artist);
+      if (!f || r.date < f.date) index.artistFirst.set(artist, { year: y, date: r.date });
+    }
+    if (hidden(r)) continue;
+
+    index.lifetimeSkips.plays++;
+    if (isSkip(r)) index.lifetimeSkips.skipped++;
+    if (artist) {
+      if (!index.artistHours.has(y)) index.artistHours.set(y, new Map());
+      bump(index.artistHours.get(y)!, artist, r.hours);
+    }
+    if (name) {
+      if (!index.trackHours.has(y)) index.trackHours.set(y, new Map());
+      bump(index.trackHours.get(y)!, trackKey(name, artist), r.hours);
+    }
+  }
+
+  index.artistHours.forEach((m, y) => {
+    const top = ranked(m)[0];
+    if (top) index.topArtist.set(y, top);
+  });
+  index.trackHours.forEach((m, y) => {
+    index.topTrackRanks.set(y, new Map(ranked(m).slice(0, COMEBACK_TOP).map((k, i) => [k, i])));
+  });
+
+  if (!perRecords) {
+    perRecords = new Map();
+    indexCache.set(records, perRecords);
+  }
+  perRecords.set(key, index);
+  return index;
+}
+
+const isPartial = (year: number, firstDate: string, lastDate: string) =>
+  firstDate > `${year}-01-14` || lastDate < `${year}-12-18`;
+
+/** Keys sorted by value, largest first. */
+const ranked = <K>(m: Map<K, number> | undefined): K[] =>
+  m ? Array.from(m.entries()).sort((a, b) => b[1] - a[1]).map(([k]) => k) : [];
+
+/** Most-listened song among `plays` (all visible, with a track name). */
+function topTrackOf(plays: ProcessedRecord[]): StoryTrack | null {
+  const acc = new Map<string, TrackAcc>();
+  for (const r of plays) {
+    const name = r.master_metadata_track_name;
+    if (!name) continue;
+    const artist = r.master_metadata_album_artist_name;
+    const key = trackKey(name, artist);
+    let a = acc.get(key);
+    if (!a) {
+      a = { track: name, artist, hours: 0, plays: 0, ids: new Map() };
+      acc.set(key, a);
+    }
+    a.hours += r.hours;
+    a.plays++;
+    const t = r.timestamp.getTime();
+    if (r.track_id && (a.ids.get(r.track_id) ?? -Infinity) < t) a.ids.set(r.track_id, t);
+  }
+  let best: TrackAcc | null = null;
+  acc.forEach(a => {
+    if (!best || a.hours > best.hours) best = a;
+  });
+  return best ? toStoryTrack(best) : null;
+}
+
+const COUNTRY_LATITUDE = new Map<string, number>(
+  (countries as { name: { common: string }; latlng: number[] }[]).map(c => [c.name.common, c.latlng[0]])
+);
+
+const SEASONS_NORTH: { season: Season; months: number[] }[] = [
+  { season: 'winter', months: [1, 2, 12] },
+  { season: 'spring', months: [3, 4, 5] },
+  { season: 'summer', months: [6, 7, 8] },
+  { season: 'autumn', months: [9, 10, 11] },
+];
+const SOUTH: Record<Season, Season> = { winter: 'summer', spring: 'autumn', summer: 'winter', autumn: 'spring' };
+
+const MIN_SEASON_HOURS = 5;
+const MIN_MONTH_HOURS = 1;
+const DISCOVERY_TOP = 20;
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const MIN_SESSION_HOURS = 2;
+const REPEAT_MIN_MS = 30_000; // Spotify counts a stream at 30 s
+const MIN_REPEAT_PLAYS = 5;
+const MIN_COUNTRY_HOURS = 1;
+const COMEBACK_TOP = 50;
+// "Barely played" the year before a comeback. Stricter values (under 3 minutes) found no comebacks at all on a
+// real 7-year history: favourites tend to get a few plays every year.
+const QUIET_YEAR_HOURS = 1;
+const MIN_SKIP_PLAYS = 100;
+
+function buildStats(
+  year: number,
+  visible: ProcessedRecord[],
+  totalHours: number,
+  partialYear: boolean,
+  topArtistName: string | null,
+  yearTrackKeys: string[],
+  index: HistoryIndex
+): StoryStats {
+  const bump = <K>(m: Map<K, number>, k: K, v: number) => m.set(k, (m.get(k) ?? 0) + v);
+
+  // Hemisphere from the country with the most listening this year (unknown → northern).
+  const countryHours = new Map<string, number>();
+  for (const r of visible) if (r.conn_country_full) bump(countryHours, r.conn_country_full, r.hours);
+  const mainCountry = ranked(countryHours)[0];
+  const southern = (mainCountry ? COUNTRY_LATITUDE.get(mainCountry) ?? 0 : 0) < 0;
+
+  // Seasons and months
+  const byMonth = new Map<number, ProcessedRecord[]>();
+  for (const r of visible) {
+    const list = byMonth.get(r.Month);
+    if (list) list.push(r);
+    else byMonth.set(r.Month, [r]);
+  }
+  const hoursOf = (list: ProcessedRecord[]) => list.reduce((sum, r) => sum + r.hours, 0);
+  const seasonList: StorySeason[] = [];
+  for (const { season, months } of SEASONS_NORTH) {
+    const plays = months.flatMap(m => byMonth.get(m) ?? []);
+    const hours = hoursOf(plays);
+    const track = hours >= MIN_SEASON_HOURS ? topTrackOf(plays) : null;
+    if (track) seasonList.push({ season: southern ? SOUTH[season] : season, months, hours, track });
+  }
+  const monthList: NonNullable<StoryStats['months']> = [];
+  for (let m = 1; m <= 12; m++) {
+    const plays = byMonth.get(m) ?? [];
+    const hours = hoursOf(plays);
+    const track = hours >= MIN_MONTH_HOURS ? topTrackOf(plays) : null;
+    if (track) monthList.push({ month: m, hours, track });
+  }
+
+  // Discoveries: first-ever play this year, and in this year's top 20 artists.
+  let discoveries: StoryDiscovery[] | null = null;
+  if (year > index.firstYear) {
+    const artistHours = index.artistHours.get(year);
+    discoveries = ranked(artistHours)
+      .slice(0, DISCOVERY_TOP)
+      .map((name, i) => ({ name, rank: i + 1, first: index.artistFirst.get(name) }))
+      .filter(a => a.first?.year === year)
+      .map(a => ({
+        name: a.name,
+        rank: a.rank,
+        hours: artistHours?.get(a.name) ?? 0,
+        firstPlayed: a.first!.date,
+        topTrack: topTrackOf(visible.filter(r => r.master_metadata_album_artist_name === a.name)),
+      }));
+    if (discoveries.length === 0) discoveries = null;
+  }
+
+  // Sessions: plays in time order; a gap over 30 minutes between one play's end and the next one's start
+  // ends the session. `timestamp` is when a play ended, so it started `ms_played` earlier.
+  type Run = { from: number; to: number; hours: number; startIdx: number; endIdx: number };
+  const sorted = [...visible].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
+  let b: Run | null = null;
+  let cur: Run | null = null;
+  for (let i = 0; i < sorted.length; i++) {
+    const r = sorted[i];
+    const end = r.timestamp.getTime();
+    const start = end - r.ms_played;
+    if (cur !== null && start - cur.to <= SESSION_GAP_MS) {
+      cur.to = Math.max(cur.to, end);
+      cur.hours += r.hours;
+      cur.endIdx = i;
+    } else {
+      cur = { from: start, to: end, hours: r.hours, startIdx: i, endIdx: i };
+    }
+    if (b === null || cur.hours > b.hours) b = { ...cur };
+  }
+  let longestSession: StorySession | null = null;
+  if (b && b.hours >= MIN_SESSION_HOURS) {
+    const plays = sorted.slice(b.startIdx, b.endIdx + 1);
+    longestSession = {
+      date: format(new Date(b.from), 'yyyy-MM-dd'),
+      start: format(new Date(b.from), 'HH:mm'),
+      end: format(new Date(b.to), 'HH:mm'),
+      hours: b.hours,
+      spanHours: (b.to - b.from) / 3_600_000,
+      plays: plays.length,
+      topTrack: topTrackOf(plays),
+    };
+  }
+
+  // Repeat day
+  const dayCounts = new Map<string, number>();
+  let repeat: { k: string; n: number } | null = null;
+  for (const r of visible) {
+    if (!r.master_metadata_track_name || r.ms_played < REPEAT_MIN_MS) continue;
+    const k = `${r.date}\u0001${trackKey(r.master_metadata_track_name, r.master_metadata_album_artist_name)}`;
+    const n = (dayCounts.get(k) ?? 0) + 1;
+    dayCounts.set(k, n);
+    if (!repeat || n > repeat.n) repeat = { k, n };
+  }
+  let repeatDay: StoryStats['repeatDay'] = null;
+  const rep = repeat as { k: string; n: number } | null;
+  if (rep && rep.n >= MIN_REPEAT_PLAYS) {
+    const [date, key] = rep.k.split('\u0001');
+    const plays = visible.filter(
+      r =>
+        r.date === date &&
+        r.master_metadata_track_name !== null &&
+        trackKey(r.master_metadata_track_name, r.master_metadata_album_artist_name) === key
+    );
+    const track = topTrackOf(plays);
+    if (track) repeatDay = { date, plays: rep.n, track };
+  }
+
+  // Time of day
+  let timeOfDay: StoryStats['timeOfDay'] = null;
+  const visibleHours = hoursOf(visible);
+  if (visibleHours > 0) {
+    const byHour = new Array<number>(24).fill(0);
+    for (const r of visible) byHour[r.Hour] += r.hours;
+    const sum = (from: number, to: number) => byHour.slice(from, to).reduce((a, h) => a + h, 0);
+    timeOfDay = {
+      byHour,
+      peakHour: byHour.indexOf(Math.max(...byHour)),
+      nightShare: sum(0, 5) / visibleHours,
+      morningShare: sum(5, 11) / visibleHours,
+    };
+  }
+
+  // Countries
+  const countryList = Array.from(countryHours.entries())
+    .filter(([, h]) => h >= MIN_COUNTRY_HOURS)
+    .sort((a, b) => b[1] - a[1])
+    .map(([country, hours]) => ({ country, hours }));
+
+  // Year over year (totals rule: all listening)
+  let yearOverYear: StoryStats['yearOverYear'] = null;
+  const prev = index.years.get(year - 1);
+  if (prev && prev.hours > 0) {
+    yearOverYear = {
+      previousYear: year - 1,
+      previousHours: prev.hours,
+      change: (totalHours - prev.hours) / prev.hours,
+      partial: partialYear || isPartial(year - 1, prev.firstDate, prev.lastDate),
+    };
+  }
+
+  // Loyalty: consecutive years (ending this year) with the same #1 artist.
+  let loyalty: StoryStats['loyalty'] = null;
+  if (topArtistName) {
+    let y = year;
+    while (index.topArtist.get(y - 1) === topArtistName) y--;
+    if (year - y + 1 >= 2) loyalty = { artist: topArtistName, years: year - y + 1, since: y };
+  }
+
+  // Comeback: in this year's top 50, barely played the year before (which must be in the history), top 50 earlier.
+  let comeback: StoryStats['comeback'] = null;
+  const prevTracks = index.trackHours.get(year - 1);
+  if (index.years.has(year - 1)) {
+    const thisTop = yearTrackKeys.slice(0, COMEBACK_TOP);
+    for (let i = 0; i < thisTop.length && !comeback; i++) {
+      const key = thisTop[i];
+      const quietYearHours = prevTracks?.get(key) ?? 0;
+      if (quietYearHours >= QUIET_YEAR_HOURS) continue;
+      let peak: { year: number; rank: number } | null = null;
+      for (let y = year - 2; y >= index.firstYear; y--) {
+        const rank = index.topTrackRanks.get(y)?.get(key);
+        if (rank !== undefined && (!peak || rank < peak.rank)) peak = { year: y, rank };
+      }
+      if (peak) {
+        const plays = visible.filter(
+          r =>
+            r.master_metadata_track_name !== null &&
+            trackKey(r.master_metadata_track_name, r.master_metadata_album_artist_name) === key
+        );
+        const track = topTrackOf(plays);
+        if (track) {
+          comeback = { track, rank: i + 1, peakYear: peak.year, peakRank: peak.rank + 1, quietYearHours };
+        }
+      }
+    }
+  }
+
+  // Skips
+  let skips: StoryStats['skips'] = null;
+  if (visible.length >= MIN_SKIP_PLAYS && index.lifetimeSkips.plays > 0) {
+    const skipped = visible.filter(isSkip).length;
+    skips = {
+      rate: skipped / visible.length,
+      lifetimeRate: index.lifetimeSkips.skipped / index.lifetimeSkips.plays,
+      skipped,
+      plays: visible.length,
+    };
+  }
+
+  return {
+    seasons: seasonList.length >= 2 ? seasonList : null,
+    months: monthList.length > 0 ? monthList : null,
+    discoveries,
+    longestSession,
+    repeatDay,
+    timeOfDay,
+    countries: countryList.length >= 2 ? countryList : null,
+    yearOverYear,
+    loyalty,
+    comeback,
+    skips,
+  };
+}
+
 /**
  * Everything the story for `year` needs. Pass the **full** history: later steps compare against earlier
  * years. Returns null when the year has no listening at all (check eligibility with `storyYears`).
  */
 export function buildStory(records: ProcessedRecord[], year: number, options: StoryOptions = {}): StoryData | null {
-  const ambient = detectAmbient(records);
-  const hiddenArtists = new Set(options.hiddenArtists ?? []);
-  const hiddenTracks = new Set(options.hiddenTracks ?? []);
+  const hidden = visibility(records, options);
+  const visible: ProcessedRecord[] = [];
   const leftOut: StoryLeftOut = { hours: 0, plays: 0, privateHours: 0, ambientHours: 0 };
 
   let totalHours = 0;
@@ -308,19 +773,17 @@ export function buildStory(records: ProcessedRecord[], year: number, options: St
     const name = r.master_metadata_track_name;
     const artist = r.master_metadata_album_artist_name;
 
-    // Counted above; from here on only what the story may name.
-    const isPrivate = r.incognito_mode;
-    const key = name ? trackKey(name, artist) : '';
-    const isAmbient =
-      (artist !== null && (ambient.artists.has(artist) || hiddenArtists.has(artist))) ||
-      (name !== null && (ambient.tracks.has(key) || hiddenTracks.has(key)));
-    if (isPrivate || isAmbient) {
+    // Counted above; from here on only what the story may show.
+    const why = hidden(r);
+    if (why) {
       leftOut.hours += r.hours;
       leftOut.plays++;
-      if (isPrivate) leftOut.privateHours += r.hours;
+      if (why === 'private') leftOut.privateHours += r.hours;
       else leftOut.ambientHours += r.hours;
       continue;
     }
+    visible.push(r);
+    const key = name ? trackKey(name, artist) : '';
 
     if (name && (!first || t < first.timestamp.getTime())) first = r;
 
@@ -398,7 +861,17 @@ export function buildStory(records: ProcessedRecord[], year: number, options: St
 
   // "Partial" if more than two weeks are missing at either end of the year (e.g. the history starts in
   // March). An export requested in late December still counts as a full year.
-  const partialYear = firstDate > `${year}-01-14` || lastDate < `${year}-12-18`;
+  const partialYear = isPartial(year, firstDate, lastDate);
+
+  const stats = buildStats(
+    year,
+    visible,
+    totalHours,
+    partialYear,
+    topArtist?.name ?? null,
+    sortedTracks.map(t => trackKey(t.track, t.artist)),
+    historyIndex(records, options)
+  );
 
   return {
     year,
@@ -417,5 +890,6 @@ export function buildStory(records: ProcessedRecord[], year: number, options: St
     topArtist,
     topTracks: sortedTracks.slice(0, TOP_TRACKS).map(toStoryTrack),
     topAlbum,
+    stats,
   };
 }

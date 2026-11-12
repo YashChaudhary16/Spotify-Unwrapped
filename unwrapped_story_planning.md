@@ -69,17 +69,17 @@ Goal: one pure function that turns a year of records into everything the story n
 
 **Done when:** `buildStory` returns sensible values for every year of the sample data and the user's real data (checked by logging, not UI).
 
-### Step B — Extra story stats
+### Step B — Extra story stats ✅ (2026-11-12)
 Goal: the "only you" moments. Each stat returns `null` when it isn't interesting, so the card is skipped instead of showing something weak.
-- [ ] **Song of each season** (Dec–Feb, Mar–May, Jun–Aug, Sep–Nov) and **song of each month**.
-- [ ] **Discoveries:** artists first played this year (never in earlier years) who reached your top 10/20.
-- [ ] **Longest session:** continuous listening with gaps under 30 minutes. Date, length, and its most-played track.
-- [ ] **Repeat day:** the most plays of a single track in one day ("On 3 March you played *X* 14 times").
-- [ ] **Time-of-day profile:** peak hour, and night (00–05) vs morning (05–11) share.
-- [ ] **Where you listened:** countries this year (only if more than one).
-- [ ] **Year over year:** listening time change vs the previous year; "#1 artist N years running" streak.
-- [ ] **Comeback song:** a track big in an earlier year, absent the year before, back in this year's top 50.
-- [ ] **Skip style:** skip rate this year (`skipped` / `reason_end = fwdbtn`) vs lifetime.
+- [x] **Song of each season** (Dec–Feb, Mar–May, Jun–Aug, Sep–Nov) and **song of each month**.
+- [x] **Discoveries:** artists first played this year (never in earlier years) who reached your top 10/20.
+- [x] **Longest session:** continuous listening with gaps under 30 minutes. Date, length, and its most-played track.
+- [x] **Repeat day:** the most plays of a single track in one day ("On 3 March you played *X* 14 times").
+- [x] **Time-of-day profile:** peak hour, and night (00–05) vs morning (05–11) share.
+- [x] **Where you listened:** countries this year with at least 1 hour of listening (only if more than one). Short blips like layovers are ignored.
+- [x] **Year over year:** listening time change vs the previous year; "#1 artist N years running" streak.
+- [x] **Comeback song:** a track in an earlier year's top 50, **barely played (under 1 hour)** the year before, back in this year's top 50. ("Absent" was too strict: no comebacks at all on the real history.)
+- [x] **Skip style:** skip rate this year (`skipped` / `reason_end = fwdbtn`) vs lifetime.
 
 **Done when:** each stat is computed and returns `null` correctly on thin years (e.g. the first, partial year of a history).
 
@@ -115,6 +115,7 @@ Goal: the full-screen, tap-through player, with placeholder cards.
 - [ ] "Play your {year} story" hero button on Overview, for the latest eligible year, with a small year picker for the others.
 - [ ] When a single year is selected in the header filter, the button uses that year.
 - [ ] Ineligible years are hidden (or disabled with "Not enough listening in {year}").
+- [ ] Warm the story cache when the dashboard is idle (`requestIdleCallback`), so the first story opens instantly. The first `buildStory` call builds the shared index (~360 ms on 279k plays in Node; slower on phones), and later years take ~55–90 ms. If it's still slow on phones, move it into the Web Worker.
 - [ ] **"Leave out of story" panel**, opened before the story starts and from a small ⋯ menu on artist/song cards:
   - Lists the auto-detected sleep/ambient artists that appear in this year (with their time), each with a checkbox to put it back.
   - "Added by you": artists or songs the viewer hid, with ✕ to remove; a search (reuse `SearchSelect`) to add any artist or song.
@@ -268,6 +269,46 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step B: extra story stats
+**Done**
+- `StoryData.stats` in `lib/story.ts`. Each stat is null when it isn't interesting, so its card gets skipped:
+  - `seasons`: top song per season. The hemisphere comes from the year's main country (latitude from `world-countries`). Winter is Jan, Feb and Dec of the same year. A season needs ≥ 5 hrs, and the stat needs 2+ seasons.
+  - `months`: top song per month with ≥ 1 hr.
+  - `discoveries`: artists first ever played this year who reached the year's top 20. Null in the history's first year.
+  - `longestSession`: gaps of 30 minutes or less, using play start = `ts − ms_played` (`ts` is when a play ended). Needs 2+ hrs. Gives date, start/end time, time played vs span, and top song.
+  - `repeatDay`: most plays of one song in a day, counting only plays of 30 s or more. Needs 5+.
+  - `timeOfDay`: hours by hour of day, peak hour, and night (00–05) and morning (05–11) shares.
+  - `countries`: countries with ≥ 1 hr; needs 2+.
+  - `yearOverYear`: total time vs the previous year, with a `partial` flag when either year is partial.
+  - `loyalty`: same #1 artist for 2+ years in a row.
+  - `comeback`: see the Step B item.
+  - `skips`: skip rate (`skipped` or `fwdbtn`) this year vs the whole history; needs 100+ plays.
+- **Rule applied:** only the totals (time, plays, active days, year over year) include private and ambient plays. Every other stat uses the plays the story may show, so sleep sounds can't skew time of day or sessions.
+- A shared history index (per-year totals, artist and song hours, top-50 ranks, #1 artists, first play per artist, lifetime skips), cached per records array and hide list.
+- Ambient phrases now include "rain forest" ("Garasia Rain Forest" by Literrain had become the 2025 winter song).
+
+**Checked on the user's real history** (Nature Therapy hidden)
+- Sensible, varied results. Examples:
+  - 2025 discoveries: translucent (#7), Karan Aujla (#20).
+  - Longest session: 16.1 hrs on 2025-01-24.
+  - Repeat day: "First Step" 162× on 2024-11-14.
+  - Countries in 2025: US, Netherlands, France (Canada, Japan and the UK were dropped as under an hour).
+  - Loyalty: Billie Eilish 2020–21 and Ramin Djawadi 2022–23.
+  - Comebacks: 2023 and 2025 only.
+- Year over year 2020 vs 2019 (+278%) is correctly flagged partial.
+- Timing: the first year takes ~360 ms (builds the index); later years take 55–90 ms each.
+
+**Changed files**
+- Updated: `lib/story.ts`
+
+**Notes / decisions**
+- Southern-hemisphere viewers get flipped season names. Tropical countries still use the four northern seasons (simple and predictable).
+- Added a Step E item to warm the cache while the dashboard is idle.
+- `tsc`, `next lint` and `next build` pass.
+
+**Next**
+- Step C: listening personality.
 
 ### 2026-11-12 — Step A follow-up: private sessions and ambient sounds left out
 **Done**
