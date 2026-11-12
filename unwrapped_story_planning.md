@@ -27,7 +27,9 @@ This file plans the next big body of work in two parts, built in this order:
 | Story scope | One story per calendar year, using the **full year** (Wrapped stops around October; we don't). *(proposed)* |
 | Minimum data | A year needs at least ~10 hours and 30 active days to get a story; otherwise its "Play story" button is hidden. *(proposed — tune on real data)* |
 | Story palette | Inside story mode only, cards may use **bold full-bleed color blocks** (cover-art colors and a curated set of saturated backgrounds), unlike the dashboard rule that green is for data only. *(proposed — needs user OK, since it relaxes a dashboard rule)* |
-| Incognito stat | "Guilty pleasure" (most-played track in private sessions) is **off by default** and only shows after the viewer opts in on that card. Never on the share image unless chosen. *(proposed)* |
+| Private sessions | Plays with `incognito_mode` **count toward totals** (time, plays, active days) but are **never named or ranked** in the story. User decision 2026-11-12. |
+| Ambient / sleep sounds | Same rule as private sessions: counted in totals, never named. Detected automatically by strict phrases (`detectAmbient` in `lib/story.ts`), plus a **"Leave out of story" list** the viewer edits (Step E). User decision 2026-11-12. |
+| Left-out footnote | **No mention** in the story of how much private or ambient listening was left out; the total simply includes it. User decision 2026-11-12. |
 | Audio in story | **Undecided.** The user rejected a playable track in "First song played", so background previews in the story need an explicit yes (see Step H). |
 | Share image | Rendered on a `<canvas>` in the browser with no new dependency (cover CDN sends CORS `*`, already verified). 9:16 story size and 1:1 square. *(proposed)* |
 | Entry point | A "Play your {year} story" button on the Overview tab, plus a year picker; linkable as `#story-2025`. *(proposed)* |
@@ -37,6 +39,8 @@ This file plans the next big body of work in two parts, built in this order:
 - Mood/energy stats from audio features (deprecated API).
 - `theme=0` on Spotify players (forces the gray player).
 - A playable track on the "First song played" card.
+- A "guilty pleasure" card from private-session plays: private sessions are never named (decision 2026-11-12).
+- A footnote saying how much private or ambient listening the story left out.
 
 ---
 
@@ -75,7 +79,6 @@ Goal: the "only you" moments. Each stat returns `null` when it isn't interesting
 - [ ] **Where you listened:** countries this year (only if more than one).
 - [ ] **Year over year:** listening time change vs the previous year; "#1 artist N years running" streak.
 - [ ] **Comeback song:** a track big in an earlier year, absent the year before, back in this year's top 50.
-- [ ] **Guilty pleasure:** most-played track with `incognito_mode` (computed always, shown only on opt-in).
 - [ ] **Skip style:** skip rate this year (`skipped` / `reason_end = fwdbtn`) vs lifetime.
 
 **Done when:** each stat is computed and returns `null` correctly on thin years (e.g. the first, partial year of a history).
@@ -112,6 +115,12 @@ Goal: the full-screen, tap-through player, with placeholder cards.
 - [ ] "Play your {year} story" hero button on Overview, for the latest eligible year, with a small year picker for the others.
 - [ ] When a single year is selected in the header filter, the button uses that year.
 - [ ] Ineligible years are hidden (or disabled with "Not enough listening in {year}").
+- [ ] **"Leave out of story" panel**, opened before the story starts and from a small ⋯ menu on artist/song cards:
+  - Lists the auto-detected sleep/ambient artists that appear in this year (with their time), each with a checkbox to put it back.
+  - "Added by you": artists or songs the viewer hid, with ✕ to remove; a search (reuse `SearchSelect`) to add any artist or song.
+  - Note: "Hidden listening still counts toward your total time."
+  - Saved in `localStorage` (per browser, wrapped in try/catch) and passed to `buildStory` as `StoryOptions` (`hiddenArtists`, `hiddenTracks`). Unticking an auto-detected artist needs a matching "shownArtists" option (add it to `StoryOptions` then).
+  - Example it must handle: "Nature Therapy" (218 hrs in 2025) has no telltale words, so only the viewer can hide it.
 
 **Done when:** the user can open a story for any eligible year from the dashboard.
 
@@ -129,9 +138,8 @@ Goal: a complete, short story.
 **Done when:** a full story plays end to end for real and sample data.
 
 ### Step G — Card set v2 (the extra stats)
-- [ ] One card per non-null stat from Step B, in a fixed narrative order: seasons → discoveries → repeat day → longest session → time of day → travel → comeback → year over year → (guilty pleasure, opt-in).
+- [ ] One card per non-null stat from Step B, in a fixed narrative order: seasons → discoveries → repeat day → longest session → time of day → travel → comeback → year over year.
 - [ ] Cap the story at about 12–14 cards. If more stats qualify, keep the most striking ones (rank by how unusual the value is).
-- [ ] Opt-in UI for the guilty-pleasure card ("Reveal your guilty pleasure?" → tap to reveal / skip).
 
 **Done when:** different years produce visibly different stories.
 
@@ -149,7 +157,7 @@ Goal: a complete, short story.
 - [ ] Mobile: the Web Share API with the image file; desktop: download PNG and "Copy image".
 - [ ] Load fonts before drawing (`document.fonts.ready`); truncate long names with "…".
 - [ ] Privacy: the image is generated on the device; nothing is uploaded.
-- [ ] Optional toggles before sharing: hide total time, include personality, include guilty pleasure.
+- [ ] Optional toggles before sharing: hide total time, include personality.
 
 **Done when:** a PNG is downloaded or shared on desktop and mobile and looks right with long names, missing artwork and every time unit.
 
@@ -160,7 +168,7 @@ Goal: a complete, short story.
 **Done when:** the sample story is fun to tap through.
 
 ### Step K — QA and hardening
-- [ ] Edge cases: first/partial year, a year with one artist, only offline plays, all plays in incognito, very long names, RTL and non-Latin names.
+- [ ] Edge cases: first/partial year, a year with one artist, only offline plays, all plays in incognito or ambient (nothing left to name: show a gentle empty card instead of a broken story), very long names, RTL and non-Latin names.
 - [ ] Performance: no jank on a mid-range phone; artwork requests capped and cached.
 - [ ] Accessibility pass (keyboard only, screen reader read-through, reduced motion).
 - [ ] `tsc`, `next lint`, `next build`; viewed in a browser on mobile and desktop.
@@ -242,7 +250,7 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 - **Step D/H:** Is the bold story palette OK inside story mode?
 - **Step H:** Background song previews in the story: yes or no?
 - **Step B/C:** Any archetypes or stats to add or drop after seeing them on real data?
-- **Step B/C:** Should ambient / sleep sounds (rain, nature tracks) count? On the user's real data, "Nature Therapy" is the 2025 top artist and rain sounds are a 2024 top-5 song. Options: count everything (honest), or offer a "leave out sleep/ambient sounds" toggle (needs a way to detect them, e.g. a user-picked list of artists).
+- ~~**Step B/C:** Should ambient / sleep sounds count?~~ Answered 2026-11-12: counted in totals, never named (see Decisions).
 - **Step E:** Should the story also be offered for "All time" (a lifetime story), or wait for Step Q?
 
 ---
@@ -260,6 +268,36 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step A follow-up: private sessions and ambient sounds left out
+**Done**
+- User decision: private-session plays and ambient/sleep sounds **count toward the totals but are never named** in the story. There's no footnote about them (see Decisions).
+- `buildStory(records, year, options)`:
+  - Totals (time, plays, active days) include everything.
+  - Everything that names or ranks (first song, top artist, songs, album, unique counts) skips private and ambient plays.
+  - The left-out time is reported in `leftOut` (for the upcoming panel, not for display in the story).
+  - The top artist's `share` is measured against the full total.
+- `detectAmbient(records)` (cached per records array, ~85 ms on 279k plays):
+  - Matches **strict phrases** ("rain sounds", "white/brown/pink noise", "thunderstorm", "for sleeping", "ambience", "ASMR", …) against "artist | album | track".
+  - An artist whose listening is ≥ 50% matches counts as ambient; otherwise only the matching songs are excluded.
+  - Single words (rain, birds, ocean, sleep) were tested and **rejected**: they flagged Imagine Dragons "Birds", Billie Eilish "Ocean Eyes", Max Richter and Vancouver Sleep Clinic. A bare "554Hz" phrase flagged JVKE, so "Hz" was dropped too.
+- `StoryOptions` (`hiddenArtists`, `hiddenTracks`) for the viewer's own hide list. The UI comes in Step E (the "Leave out of story" panel, user's choice).
+
+**Checked on the user's real history**
+- 261 ambient artists auto-detected, no false positives in the top flagged list after the Hz fix.
+- **Nature Therapy isn't detected** (titles like "Rumbling Tweets"), which is expected; it needs the hide list. With it hidden, total time is unchanged (2,982 hrs) and the 2025 #1 artist becomes Emile Mosseri.
+- Private sessions: 9.8 hrs in 2021, left out of names and counted in the total.
+- 2024's rain-sounds song left the top 5.
+
+**Changed files**
+- Updated: `lib/story.ts`
+
+**Notes / decisions**
+- Dropped the "guilty pleasure" card (it was built on private-session plays).
+- `tsc`, `next lint` and `next build` pass.
+
+**Next**
+- Step B: extra story stats. They follow the same rule: totals count everything, and names skip private and ambient plays.
 
 ### 2026-11-12 — Step A: story data layer
 **Done**
