@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step C (personality)
+- New `lib/personality.ts` (ten archetypes plus an All-Rounder) and `stats.habits` in `lib/story.ts`; `buildStory` returns `personality`. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Step B (extra stats)
 - `lib/story.ts` gains `stats`: seasons, months, discoveries, longest session, repeat day, time of day, countries, year over year, loyalty, comeback, skips. Details are in `unwrapped_story_planning.md` → Work Log.
 

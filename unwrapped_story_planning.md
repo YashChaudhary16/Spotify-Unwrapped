@@ -83,20 +83,22 @@ Goal: the "only you" moments. Each stat returns `null` when it isn't interesting
 
 **Done when:** each stat is computed and returns `null` correctly on thin years (e.g. the first, partial year of a history).
 
-### Step C — Listening personality
+### Step C — Listening personality ✅ (2026-11-12; waiting on the user's verdict on the labels)
 Goal: a fun, shareable label built from rules that can be explained.
-- [ ] `lib/personality.ts`: a list of archetypes, each with a rule, a score, a title, a one-line description and an icon:
-  - **The Loyalist:** top artist is more than 25% of the year.
-  - **The Explorer:** high share of first-time artists.
-  - **The Night Owl / The Early Bird:** night or morning share well above average.
-  - **The Repeat Offender:** high replays per day of the same track.
-  - **The Skipper:** skip rate above ~40%.
-  - **The Deep Diver:** listens to albums in order (`reason_start = trackdone` within one album).
-  - **The Shuffler:** shuffle share above ~80%.
-  - **The Globetrotter:** listening in 3 or more countries.
-- [ ] The strongest archetype wins (score relative to its threshold). Show the runner-up as "with a touch of …".
-- [ ] Each personality shows the evidence ("38% of your listening was Arijit Singh").
-- [ ] Tune thresholds on sample data and the user's real years so results vary by year and aren't always the same label.
+- [x] `lib/personality.ts`: a list of archetypes, each with a rule, a score, a title, a one-line description and an icon (thresholds as built; score = value ÷ threshold):
+  - **The Loyalist:** top artist ≥ 20% of the year's visible listening.
+  - **The Explorer:** ≥ 25% of listening on artists first played this year.
+  - **The Night Owl / The Early Bird:** ≥ 15% of listening between 00–05, or ≥ 33% between 05–11.
+  - **The Repeat Offender:** ≥ 33% of plays (30 s+) repeat a song already played that day.
+  - **The Skipper:** skip rate ≥ 35%.
+  - **The Deep Diver:** ≥ 20% of plays follow the previous track of the same album to its end, without shuffle.
+  - **The Shuffler:** ≥ 85% of plays on shuffle.
+  - **The Globetrotter:** 3+ countries with an hour or more of listening.
+  - **The Marathoner** (added): ≥ 35% of listening in sessions of 3+ hours.
+  - **The All-Rounder** (fallback): nothing qualifies.
+- [x] The strongest archetype wins (score relative to its threshold). Show the runner-up as "with a touch of …" (only if it also qualifies).
+- [x] Each personality shows the evidence ("38% of your listening was Arijit Singh"). Evidence is percent-based, so it doesn't depend on the time unit.
+- [x] Tune thresholds on sample data and the user's real years so results vary by year and aren't always the same label.
 
 **Done when:** every eligible year gets a personality, and the user agrees the labels feel right for their own years.
 
@@ -269,6 +271,42 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step C: listening personality
+**Done**
+- `StoryData.stats.habits` (in `lib/story.ts`) holds the measures behind the personality, all from visible plays:
+  - top artist share, share of listening on new artists, night and morning shares
+  - shuffle share, skip rate, repeat share, album-in-order share, share of listening in sessions of 3+ hrs
+  - number of countries
+- New `lib/personality.ts`:
+  - Ten archetypes plus an All-Rounder fallback. Each has a title, a one-line description, a lucide icon name and percent-based evidence.
+  - Score = value ÷ threshold. The highest score ≥ 1 wins, and the second (if ≥ 1) is "with a touch of …".
+  - `buildStory` now returns `personality`.
+- Added **The Marathoner** (long sessions); the user's 2025 needed it.
+
+**Results**
+| Year | Sample data | User's real history (Nature Therapy hidden) |
+|---|---|---|
+| 2025 | | Marathoner + touch of Globetrotter (42% in 3+ hr sessions; 3 countries) |
+| 2024 | Loyalist + touch of Night Owl (35% Velvet Static) | Repeat Offender (37% same-day repeats) |
+| 2023 | Loyalist + touch of Night Owl | Shuffler + touch of Skipper (88% shuffle; 36% skipped) |
+| 2022 | | Shuffler (98%) |
+| 2021 | | Shuffler (95%) |
+| 2020 | | Explorer + touch of Repeat Offender (41% new artists) |
+| 2019 | | Repeat Offender (40%) |
+- With Nature Therapy **not** hidden, 2025 would also score as a Night Owl (1.09) because of the sleep sounds. That supports the visible-plays rule and the hide list.
+
+**Changed files**
+- New: `lib/personality.ts`
+- Updated: `lib/story.ts`
+
+**Notes / decisions**
+- 2020's "Explorer" is partly because the history starts in March 2019: any artist from before that counts as new in 2020.
+- `tsc`, `next lint` and `next build` pass.
+- **Waiting on the user:** do these labels feel right for their years?
+
+**Next**
+- Step D: story player shell.
 
 ### 2026-11-12 — Step B: extra story stats
 **Done**

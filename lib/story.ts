@@ -2,6 +2,7 @@ import { format } from 'date-fns';
 // @ts-ignore - world-countries has type resolution issues with Next.js (same as lib/preprocessing.ts)
 import countries from 'world-countries';
 import { ProcessedRecord } from './preprocessing';
+import { getPersonality, StoryPersonality } from './personality';
 
 /**
  * Data for the "Your Unwrapped Story" mode (see unwrapped_story_planning.md, Step A).
@@ -88,6 +89,8 @@ export interface StoryData {
   topAlbum: StoryAlbum | null;
   /** Extra moments (Step B); each is null when there's nothing interesting to say. */
   stats: StoryStats;
+  /** Listening personality (Step C, `lib/personality.ts`). */
+  personality: StoryPersonality | null;
 }
 
 export type Season = 'winter' | 'spring' | 'summer' | 'autumn';
@@ -166,6 +169,31 @@ export interface StoryStats {
   } | null;
   /** Share of plays skipped (`skipped` or ended with the next button), this year and over the whole history. Needs 100+ plays. */
   skips: { rate: number; lifetimeRate: number; skipped: number; plays: number } | null;
+  /** Listening habits behind the personality (Step C). Shares are 0–1. Null when nothing is visible. */
+  habits: StoryHabits | null;
+}
+
+export interface StoryHabits {
+  /** Visible plays (the denominator for the play-based shares below). */
+  plays: number;
+  /** Top artist's share of visible listening time (hidden ambient time doesn't dilute it). */
+  topArtistShare: number;
+  /** Listening time on artists first ever played this year. Null in the history's first year. */
+  newArtistShare: number | null;
+  nightShare: number;
+  morningShare: number;
+  /** Plays with shuffle on. */
+  shuffleShare: number;
+  /** Plays that were skipped (`skipped` or the next button). */
+  skipRate: number;
+  /** Plays (30 s+) that repeat a song already played that day. */
+  repeatShare: number;
+  /** Plays that followed the previous track of the same album to its end, without shuffle: album-in-order listening. */
+  albumFlowShare: number;
+  /** Listening time inside sessions of 3+ hours. */
+  longSessionShare: number;
+  /** Countries with at least an hour of listening. */
+  countries: number;
 }
 
 /** What was counted in the totals but left out of everything that names a song, artist or album. */
@@ -530,6 +558,7 @@ const COMEBACK_TOP = 50;
 // real 7-year history: favourites tend to get a few plays every year.
 const QUIET_YEAR_HOURS = 1;
 const MIN_SKIP_PLAYS = 100;
+const LONG_SESSION_HOURS = 3;
 
 function buildStats(
   year: number,
@@ -595,6 +624,7 @@ function buildStats(
   const sorted = [...visible].sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
   let b: Run | null = null;
   let cur: Run | null = null;
+  const sessionHours: number[] = [];
   for (let i = 0; i < sorted.length; i++) {
     const r = sorted[i];
     const end = r.timestamp.getTime();
@@ -607,6 +637,9 @@ function buildStats(
       cur = { from: start, to: end, hours: r.hours, startIdx: i, endIdx: i };
     }
     if (b === null || cur.hours > b.hours) b = { ...cur };
+    // Close the session when the next play starts a new one (or this is the last play).
+    const next = sorted[i + 1];
+    if (!next || next.timestamp.getTime() - next.ms_played - cur.to > SESSION_GAP_MS) sessionHours.push(cur.hours);
   }
   let longestSession: StorySession | null = null;
   if (b && b.hours >= MIN_SESSION_HOURS) {
@@ -715,6 +748,55 @@ function buildStats(
     }
   }
 
+  // Habits (for the personality)
+  let habits: StoryHabits | null = null;
+  if (visible.length > 0 && visibleHours > 0) {
+    const artistHours = index.artistHours.get(year);
+    const topArtistHours = topArtistName ? artistHours?.get(topArtistName) ?? 0 : 0;
+    let newArtistHours = 0;
+    artistHours?.forEach((h, name) => {
+      if (index.artistFirst.get(name)?.year === year) newArtistHours += h;
+    });
+
+    let repeatPlays = 0;
+    let longPlays = 0;
+    dayCounts.forEach(n => {
+      longPlays += n;
+      repeatPlays += n - 1;
+    });
+
+    let albumFlow = 0;
+    for (let i = 1; i < sorted.length; i++) {
+      const r = sorted[i];
+      const prev = sorted[i - 1];
+      if (
+        !r.shuffle &&
+        r.reason_start === 'trackdone' &&
+        r.master_metadata_album_album_name !== null &&
+        r.master_metadata_album_album_name === prev.master_metadata_album_album_name &&
+        r.master_metadata_album_artist_name === prev.master_metadata_album_artist_name &&
+        r.master_metadata_track_name !== prev.master_metadata_track_name
+      ) {
+        albumFlow++;
+      }
+    }
+
+    habits = {
+      plays: visible.length,
+      topArtistShare: topArtistHours / visibleHours,
+      newArtistShare: year > index.firstYear ? newArtistHours / visibleHours : null,
+      nightShare: timeOfDay?.nightShare ?? 0,
+      morningShare: timeOfDay?.morningShare ?? 0,
+      shuffleShare: visible.filter(r => r.shuffle).length / visible.length,
+      skipRate: visible.filter(isSkip).length / visible.length,
+      repeatShare: longPlays > 0 ? repeatPlays / longPlays : 0,
+      albumFlowShare: albumFlow / visible.length,
+      longSessionShare:
+        sessionHours.filter(h => h >= LONG_SESSION_HOURS).reduce((a, h) => a + h, 0) / visibleHours,
+      countries: countryList.length,
+    };
+  }
+
   // Skips
   let skips: StoryStats['skips'] = null;
   if (visible.length >= MIN_SKIP_PLAYS && index.lifetimeSkips.plays > 0) {
@@ -739,6 +821,7 @@ function buildStats(
     loyalty,
     comeback,
     skips,
+    habits,
   };
 }
 
@@ -873,7 +956,7 @@ export function buildStory(records: ProcessedRecord[], year: number, options: St
     historyIndex(records, options)
   );
 
-  return {
+  const story: Omit<StoryData, 'personality'> = {
     year,
     totalHours,
     plays,
@@ -892,4 +975,5 @@ export function buildStory(records: ProcessedRecord[], year: number, options: St
     topAlbum,
     stats,
   };
+  return { ...story, personality: getPersonality({ ...story, personality: null }) };
 }
