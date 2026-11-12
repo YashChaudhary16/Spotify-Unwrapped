@@ -132,6 +132,22 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Unavailable tracks: styled fallback instead of Spotify's gray player
+**Done**
+- Some history track IDs can't be played for the viewer anymore, and Spotify's embed then shows an empty gray player. Example: Chunar (`6zyBA0diqQ5DsWUZdJWWfa`), where the embed data says `isPlayable: false, playabilityReason: "COUNTRY_RESTRICTED"`. The export itself has no field for this.
+- **Detection (client-side, no server):** Spotify's public oEmbed returns **200 with an empty `title` and no thumbnail** for such tracks, and **404** for IDs that no longer exist. `useTrackAvailability(trackId)` in `lib/useSpotifyArtwork.ts` reads that. oEmbed calls are now shared and cached with the artwork hook (one request per track). Network errors count as "available", so the normal player still shows.
+- `LazySpotifyEmbed` runs the check once the row scrolls into view, in parallel with the iframe. The player only fades in once both have finished, so an unplayable track never flashes gray.
+- **Fallback card** (same 80px footprint): a dark gradient panel, a raised note-icon tile, "Not playable here", and "Removed or region-locked on Spotify", plus an outlined **"Find on Spotify ↗"** pill that opens `open.spotify.com/search/<track artist>`. The song often still exists under a newer ID.
+- Applies to Top Tracks and the "Most listened track" card. `LazySpotifyEmbed` now takes `trackName` and `artist`.
+
+**Changed files**
+- Updated: `lib/useSpotifyArtwork.ts`, `components/ui/LazySpotifyEmbed.tsx`, `components/TopTracks.tsx`, `components/MostListenedTrack.tsx`
+
+**Notes / decisions**
+- The check runs in the viewer's browser, so region locks are judged for *their* region (a server check would use Vercel's region).
+- Privacy: only the track ID goes to Spotify, as before.
+- Verified with curl: Chunar's oEmbed gives an empty title, a known-good track gives a title, and a fake ID gives 404. `tsc`, `next lint` and `next build` pass. Not viewed in a browser here.
+
 ### 2026-11-10 — Albums tab: cover-color cards + cover art in the album header
 **Done**
 - **Top-album cards** (`AlbumCard` in `components/AlbumAnalytics.tsx`): each card's background is a 135° gradient from its **cover's dominant color** to the card color (via `useSpotifyArtwork`, fading in once loaded). Secondary text is `white/80` (≥ 4.5:1 on the tint; the usual `#B3B3B3` would be about 3.7:1), and the depth pill is `bg-black/30`. The selected card has a green border plus ring, and hover adds a faint lift.

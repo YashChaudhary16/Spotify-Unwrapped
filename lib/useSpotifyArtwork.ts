@@ -53,18 +53,41 @@ function dominantColor(img: HTMLImageElement): string {
   return `rgb(${Math.round(r * scale)}, ${Math.round(g * scale)}, ${Math.round(b * scale)})`;
 }
 
+interface OEmbed {
+  title?: string;
+  thumbnail_url?: string;
+}
+
+const oembedCache = new Map<string, Promise<OEmbed | null>>();
+
+/**
+ * Spotify's public oEmbed endpoint: no login or API key, CORS-enabled. Only the track ID is sent.
+ * Resolves to null when Spotify doesn't know the ID (404); rejects on network errors.
+ */
+function fetchOEmbed(trackId: string): Promise<OEmbed | null> {
+  const cached = oembedCache.get(trackId);
+  if (cached) return cached;
+  const promise = (async () => {
+    const res = await fetch(
+      `https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/track/${trackId}`)}`
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) throw new Error(`oEmbed ${res.status}`);
+    return (await res.json()) as OEmbed;
+  })();
+  // Don't cache failures, so a flaky network can retry later.
+  promise.catch(() => oembedCache.delete(trackId));
+  oembedCache.set(trackId, promise);
+  return promise;
+}
+
 function loadArtwork(trackId: string): Promise<SpotifyArtwork | null> {
   const cached = cache.get(trackId);
   if (cached) return cached;
 
   const promise = (async () => {
-    // Public oEmbed endpoint: no login or API key, CORS-enabled. Only the track ID is sent.
-    const res = await fetch(
-      `https://open.spotify.com/oembed?url=${encodeURIComponent(`https://open.spotify.com/track/${trackId}`)}`
-    );
-    if (!res.ok) return null;
-    const json: { thumbnail_url?: string } = await res.json();
-    if (!json.thumbnail_url) return null;
+    const json = await fetchOEmbed(trackId);
+    if (!json?.thumbnail_url) return null;
     const imageUrl = json.thumbnail_url.replace(COVER_300, COVER_640);
 
     const img = new Image();
@@ -101,4 +124,35 @@ export function useSpotifyArtwork(trackId: string | null): SpotifyArtwork | null
   }, [trackId]);
 
   return artwork;
+}
+
+export type TrackAvailability = 'checking' | 'available' | 'unavailable';
+
+/**
+ * Whether Spotify can play a track for this viewer. A track whose ID no longer exists (404), or that
+ * is blocked in the viewer's region, comes back from oEmbed with no title (the embed page then reports
+ * `isPlayable: false`, e.g. `COUNTRY_RESTRICTED`). Network errors count as available, so the normal
+ * player still shows. Pass null to skip the check (e.g. until the row scrolls into view).
+ */
+export function useTrackAvailability(trackId: string | null): TrackAvailability {
+  const [status, setStatus] = useState<TrackAvailability>('checking');
+
+  useEffect(() => {
+    setStatus('checking');
+    if (!trackId) return;
+    let cancelled = false;
+    fetchOEmbed(trackId)
+      .then(
+        (json): TrackAvailability => (json?.title?.trim() ? 'available' : 'unavailable'),
+        (): TrackAvailability => 'available'
+      )
+      .then(result => {
+        if (!cancelled) setStatus(result);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [trackId]);
+
+  return status;
 }

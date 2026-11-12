@@ -48,6 +48,8 @@ export default function TopTracks({ tracks }: TopTracksProps) {
               <LazySpotifyEmbed
                 trackId={track.trackId}
                 title={`Play ${track.track} on Spotify`}
+                trackName={track.track}
+                artist={track.artist}
                 className="w-full shrink-0 md:w-[320px]"
               />
             )}

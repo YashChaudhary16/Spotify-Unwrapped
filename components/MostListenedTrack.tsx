@@ -84,7 +84,13 @@ export default function MostListenedTrack({ track }: MostListenedTrackProps) {
 
         {track.trackId && (
           <div className="mt-auto pt-5">
-            <LazySpotifyEmbed trackId={track.trackId} title={`Play ${track.track} on Spotify`} className="w-full" />
+            <LazySpotifyEmbed
+              trackId={track.trackId}
+              title={`Play ${track.track} on Spotify`}
+              trackName={track.track}
+              artist={track.artist}
+              className="w-full"
+            />
           </div>
         )}
       </div>
