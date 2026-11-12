@@ -104,6 +104,7 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - [x] Guard rails for wrong uploads and for "zero playable tracks"
 
 ### Later / ideas (not committed)
+- **Story mode and "Wrapped Can't Do" features** are planned in `unwrapped_story_planning.md` (Steps A–V, created 2026-11-12).
 - **Podcasts and audiobooks tab/page**: they're currently excluded and counted in the import notice (decision 2026-11-09). A dedicated tab could use `episode_show_name`, `episode_name`, `audiobook_title` and so on; `isPodcastOrAudiobook()` in `lib/preprocessing.ts` already identifies them.
 - `/api/preprocess` is unused; leave it alone for now (user decision 2026-11-09).
 - Regenerate `lib/countryTimezones.ts` when the tz database changes: `node scripts/generate-country-timezones.mjs`.
@@ -131,6 +132,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-12 — New plan: Unwrapped Story + "Wrapped Can't Do"
+- Created `unwrapped_story_planning.md` with the next body of work: story mode (Steps A–K), "Wrapped Can't Do" features (L–R) and showcase (S–V). Its Work Log tracks that work; this log gets a one-line pointer per session.
 
 ### 2026-11-12 — Unavailable tracks: styled fallback instead of Spotify's gray player
 **Done**

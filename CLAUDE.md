@@ -4,6 +4,7 @@ Unwrapped: a privacy-first dashboard for Spotify extended streaming history (Nex
 
 ## Start of every session
 - **Read `PLANNING.md` first.** It has the decisions, the Spotify design tokens, the roadmap, "Later / ideas", and a dated Work Log, including ideas the user rejected. Don't re-suggest those.
+- For story mode and the "Wrapped Can't Do" features, also read `unwrapped_story_planning.md` (Steps A–V, its own Work Log, open questions).
 
 ## Working rules
 - **Don't commit or push.** The user reviews and commits. When a change is done, give them ready-to-run `git` commands. Pushing to `main` deploys to production on Vercel.
