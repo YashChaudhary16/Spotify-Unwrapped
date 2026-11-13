@@ -127,23 +127,23 @@ Goal: the full-screen, tap-through player, with placeholder cards.
 
 **Done when:** the user can open a story for any eligible year from the dashboard.
 
-### Step F — Card set v1 (the core story)
+### Step F — Card set v1 (the core story) ✅ (2026-11-12; not yet viewed in a browser)
 Goal: a complete, short story.
-- [ ] A small ⋯ menu on the top-artist and top-song cards with "Leave out of story" (moved from Step E). It hides that item through `useStoryHidden` and the story recomputes; the player already keeps the card index in range when cards drop out.
-1. [ ] **Intro:** "{year}, unwrapped." Includes the year's first song.
-2. [ ] **Total time:** a big counting-up number in the selected time unit (`formatDuration`), plus the equivalent.
-3. [ ] **Top artist:** photo and Spotify artist colors (`useSpotifyArtist`), time and share.
-4. [ ] **Top 5 songs:** cover art (`useSpotifyArtwork`), revealed one by one from #5 to #1.
-5. [ ] **Top album:** cover art and play count.
-6. [ ] **Personality:** title, description and evidence.
-7. [ ] **Summary:** top artist, top 5 songs, total time, personality. This is the card that becomes the share image.
-- [ ] Fallbacks for sample data and unavailable tracks (no artwork): gradient tiles, no broken images.
+- [x] A small ⋯ menu on the top-artist and top-song cards with "Leave out of story" (moved from Step E). It hides that item through `useStoryHidden` and the story recomputes; the player already keeps the card index in range when cards drop out.
+1. [x] **Intro:** "{year}, unwrapped." Includes the year's first song (and "Your history starts on …" for a year that starts late).
+2. [x] **Total time:** a big number in the selected time unit (`formatDuration`), the equivalent, and pills for active days, songs and artists. *The count-up animation is left for Step H.*
+3. [x] **Top artist:** photo and Spotify artist colors (`useSpotifyArtist`), time and share.
+4. [x] **Top 5 songs:** cover art (`useSpotifyArtwork`), revealed one by one from #5 to #1.
+5. [x] **Top album:** cover art and play count.
+6. [x] **Personality:** title, description and evidence.
+7. [x] **Summary:** top artist, top 5 songs, total time, personality. This is the card that becomes the share image.
+- [x] Fallbacks for sample data and unavailable tracks (no artwork): gradient tiles, no broken images.
 
 **Done when:** a full story plays end to end for real and sample data.
 
-### Step G — Card set v2 (the extra stats)
-- [ ] One card per non-null stat from Step B, in a fixed narrative order: seasons → discoveries → repeat day → longest session → time of day → travel → comeback → year over year.
-- [ ] Cap the story at about 12–14 cards. If more stats qualify, keep the most striking ones (rank by how unusual the value is).
+### Step G — Card set v2 (the extra stats) ✅ (2026-11-12; not yet viewed in a browser)
+- [x] One card per non-null stat from Step B, in a fixed narrative order: seasons → months → discoveries → repeat day → longest session → time of day → travel → comeback → year over year → skips. Loyalty ("#1 for N years running") is a line on the top-artist card. Year over year is skipped when either year is partial or the change is under 5%, and skips when within 5 points of the lifetime rate.
+- [x] Cap the story at about 12–14 cards. If more stats qualify, keep the most striking ones (rank by how unusual the value is).
 
 **Done when:** different years produce visibly different stories.
 
@@ -275,6 +275,47 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Steps F and G: designed cards
+**Done**
+- `components/story/cards.tsx`, `buildStoryCards(story, ctx)`. Card order: intro → total time → top artist → top songs → top album → extras → personality → summary.
+  - **Intro:** "{year}, unwrapped." plus the first song with its cover.
+  - **Total time:** with the equivalent, plus pills for active days, songs and artists.
+  - **Top artist:** big round photo from Spotify, background in Spotify's artist color, share of listening, and "Your #1 for N years running".
+  - **Top songs:** covers, revealed from #5 up to #1.
+  - **Top album:** large cover.
+  - **Personality:** icon, title, "with a touch of", description and evidence pill.
+  - **Summary:** artist photo, top artist, listening time, top 5 songs, personality.
+- **Extras (Step G):** seasons, month by month, discoveries (photo of the lead artist), on repeat, longest session, time of day (24-bar chart, peak hour in green), countries (bars), the comeback, year over year, skip check.
+  - Each extra has a "how striking" score. The best ones fill the card budget (14 cards max) and are then shown in narrative order.
+- **⋯ "Leave out of story" menus** (`LeaveOutMenu.tsx`) on the top artist, top songs, first song, seasons, on-repeat, longest-session, discovery and comeback cards.
+  - While a menu is open the story holds still (new `StoryHoldContext` in the player).
+  - Artists use the auto-aware rule (re-hides a put-back ambient artist). Songs always go on the viewer's own list, which beats every other rule.
+- **Artwork** (`artwork.tsx`): `Cover`, `ArtistPhoto`, and `CardBackground`, which fades from a tone to the cover or artist color once it's known.
+  - The hooks gained `prefetchSpotifyArtwork` / `prefetchSpotifyArtist`, and the dashboard prefetches a story's art when it opens (about 15–20 requests, only public track IDs).
+- **Sizing:** the player's card is now a CSS size container, so text is sized in `cqw` and scales with the card on phones and desktop.
+- **Palette** (`palette.ts`): deep tinted gradients (violet, green, blue, rose, amber, teal, slate). The bold color-block decision is still Step H, and changing this file restyles every card.
+- Removed `components/story/placeholderCards.tsx`.
+
+**Checked** (Node, real card builder, rendered to HTML)
+- Card lists by year:
+  - 2025: intro → total → top artist → top songs → top album → seasons → discoveries → repeat day → longest session → countries → comeback → year over year → personality → summary (14).
+  - 2022 gets the skip check; 2019 has 12 cards.
+  - Sample data: 13–14 cards.
+- 312 cards rendered with no errors: every real year × 3 time units, plus the sample data.
+- Comeback copy, for example: "Phoenix. Your #23 in 2021. After a quiet 2024, it climbed back to #35."
+
+**Changed files**
+- New: `components/story/cards.tsx`, `artwork.tsx`, `palette.ts`, `LeaveOutMenu.tsx`, `context.ts`
+- Updated: `components/story/StoryPlayer.tsx`, `components/Dashboard.tsx`, `lib/useSpotifyArtwork.ts`, `lib/useSpotifyArtist.ts`, `app/globals.css` (`story-row-in` keyframe)
+- Deleted: `components/story/placeholderCards.tsx`
+
+**Notes / decisions**
+- The home page bundle went from 288 kB to 295 kB.
+- `tsc`, `next lint` and `next build` pass. **Not viewed in a browser.** Check the text sizes, the long names, and the ⋯ menu taps on a phone.
+
+**Next**
+- Step H: visual and motion polish. It needs the user's decisions on the bold palette and on background song previews.
 
 ### 2026-11-12 — Step E: entry point and "Leave out of story"
 **Done**

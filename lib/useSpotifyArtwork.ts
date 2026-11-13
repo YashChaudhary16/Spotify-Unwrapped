@@ -107,6 +107,11 @@ function loadArtwork(trackId: string): Promise<SpotifyArtwork | null> {
   return promise;
 }
 
+/** Starts loading a track's cover and color into the cache (e.g. for the next story cards). */
+export function prefetchSpotifyArtwork(trackId: string | null | undefined): void {
+  if (trackId) void loadArtwork(trackId);
+}
+
 /** Album cover + dominant color for a Spotify track, or null while loading / unavailable. */
 export function useSpotifyArtwork(trackId: string | null): SpotifyArtwork | null {
   const [artwork, setArtwork] = useState<SpotifyArtwork | null>(null);

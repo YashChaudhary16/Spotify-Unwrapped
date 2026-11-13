@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Steps F and G (designed cards)
+- `components/story/cards.tsx` and helpers: the designed core cards and extra-moment cards (up to 14 per story), ⋯ "Leave out of story" menus, cover art and artist photos, cards sized in `cqw`. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Step E (entry point, "Leave out of story")
 - Overview banner with "Play your {year} story" and year chips; "Leave out of story" panel saved in this browser; idle cache warm-up. Details are in `unwrapped_story_planning.md` → Work Log.
 

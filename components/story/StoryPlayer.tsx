@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPoi
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, EyeOff, Pause, Play, X } from 'lucide-react';
 import { DEFAULT_CARD_MS, type StoryCard } from './types';
+import { StoryHoldContext } from './context';
 
 interface StoryPlayerProps {
   /** Accessible name of the dialog, e.g. "Your 2025 story". */
@@ -53,6 +54,13 @@ export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = fal
   const [userPaused, setUserPaused] = useState(false);
   const [held, setHeld] = useState(false);
   const [tabHidden, setTabHidden] = useState(false);
+  /** Things inside cards (open menus) holding the story still. */
+  const [holds, setHolds] = useState<string[]>([]);
+  const hold = useCallback(
+    (id: string, on: boolean) =>
+      setHolds(prev => (on ? (prev.includes(id) ? prev : [...prev, id]) : prev.includes(id) ? prev.filter(h => h !== id) : prev)),
+    []
+  );
   const reducedMotion = usePrefersReducedMotion();
   const dialogRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
@@ -61,7 +69,7 @@ export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = fal
   const count = cards.length;
   const card = cards[index];
   const isLast = index === count - 1;
-  const paused = userPaused || held || tabHidden || suspended;
+  const paused = userPaused || held || tabHidden || suspended || holds.length > 0;
 
   const next = useCallback(() => setIndex(i => Math.min(i + 1, count - 1)), [count]);
   const prev = useCallback(() => setIndex(i => Math.max(i - 1, 0)), []);
@@ -207,16 +215,18 @@ export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = fal
         onPointerCancel={endPress}
         onPointerLeave={endPress}
         onContextMenu={e => e.preventDefault()}
-        className="relative h-[100dvh] w-full touch-none select-none overflow-hidden bg-spotify-dark [-webkit-touch-callout:none] sm:aspect-[9/16] sm:h-[min(92dvh,880px)] sm:w-auto sm:rounded-2xl sm:shadow-2xl"
+        className="relative h-[100dvh] w-full touch-none select-none overflow-hidden bg-spotify-dark [container-type:size] [-webkit-touch-callout:none] sm:aspect-[9/16] sm:h-[min(92dvh,880px)] sm:w-auto sm:rounded-2xl sm:shadow-2xl"
         style={{ background: card.background }}
       >
         {/* Card content */}
-        <div
-          key={card.id}
-          className="absolute inset-0 flex flex-col px-6 pb-10 pt-[calc(env(safe-area-inset-top)+4.5rem)] motion-safe:animate-[story-card-in_350ms_ease-out]"
-        >
-          {card.content}
-        </div>
+        <StoryHoldContext.Provider value={hold}>
+          <div
+            key={card.id}
+            className="absolute inset-0 flex flex-col px-6 pb-10 pt-[calc(env(safe-area-inset-top)+4.5rem)] motion-safe:animate-[story-card-in_350ms_ease-out]"
+          >
+            {card.content}
+          </div>
+        </StoryHoldContext.Provider>
 
         {/* Top bar: progress, pause, close */}
         <div className="absolute inset-x-0 top-0 bg-gradient-to-b from-black/40 to-transparent px-3 pb-6 pt-[calc(env(safe-area-inset-top)+0.75rem)]">

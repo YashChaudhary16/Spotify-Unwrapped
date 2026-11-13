@@ -25,12 +25,12 @@ import MonthlyWeekdayCharts from './MonthlyWeekdayCharts';
 import ArtistAnalytics from './ArtistAnalytics';
 import ArtistPicker from './ArtistPicker';
 import AlbumAnalytics from './AlbumAnalytics';
-import { buildStory, storyHideCandidates, storyYears } from '@/lib/story';
+import { buildStory, detectAmbient, storyHideCandidates, storyTrackKey, storyYears } from '@/lib/story';
 import { useStoryHidden } from '@/lib/useStoryHidden';
 import { StoryPlayer } from './story/StoryPlayer';
 import { StoryHero } from './story/StoryHero';
 import { LeaveOutPanel } from './story/LeaveOutPanel';
-import { buildPlaceholderCards } from './story/placeholderCards';
+import { buildStoryCards, prefetchStoryArt } from './story/cards';
 
 interface DashboardProps {
   data: ProcessedRecord[];
@@ -136,7 +136,23 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     () => (storyYear !== null ? buildStory(data, storyYear, storyOptions) : null),
     [data, storyYear, storyOptions]
   );
-  const storyCards = useMemo(() => (story ? buildPlaceholderCards(story, unit) : []), [story, unit]);
+  // "Leave out of story" from a card's ⋯ menu. An auto-detected artist the viewer had put back is re-hidden.
+  const hideStoryArtist = useCallback(
+    (artist: string) => setArtistHidden(artist, true, detectAmbient(data).artists.has(artist)),
+    [data, setArtistHidden]
+  );
+  // Songs always go on the viewer's own list: it beats every other rule (e.g. an artist they put back).
+  const hideStoryTrack = useCallback(
+    (track: string, artist: string | null) => setTrackHidden(storyTrackKey(track, artist), true, false),
+    [setTrackHidden]
+  );
+  const storyCards = useMemo(
+    () => (story ? buildStoryCards(story, { unit, hideArtist: hideStoryArtist, hideTrack: hideStoryTrack }) : []),
+    [story, unit, hideStoryArtist, hideStoryTrack]
+  );
+  useEffect(() => {
+    if (story) prefetchStoryArt(story);
+  }, [story]);
   const hideCandidates = useMemo(
     () => (leaveOut ? storyHideCandidates(data, leaveOut.year) : null),
     [data, leaveOut]
