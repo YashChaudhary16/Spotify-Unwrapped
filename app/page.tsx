@@ -97,10 +97,15 @@ export default function Home() {
     setLoading(true);
     setError(null);
     setProgress(null);
-    // Let the spinner paint before the (short) generation work.
-    await new Promise(resolve => setTimeout(resolve, 30));
-    const { generateSampleHistory } = await import('@/lib/sampleData');
-    finish(preprocessStreamingHistory(generateSampleHistory()), true);
+    try {
+      // A real year of listening (see lib/demoHistory.ts), fetched only now. The file has a day of margin on
+      // each side for timezones, so keep only plays that fall in the demo year in local time.
+      const { loadDemoHistory } = await import('@/lib/demoHistory');
+      const { year, records } = await loadDemoHistory();
+      finish(preprocessStreamingHistory(records).filter(r => r.Year === year), true);
+    } catch (err) {
+      fail(err instanceof Error ? err.message : 'Could not load the sample data.');
+    }
   };
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({

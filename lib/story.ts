@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import countries from 'world-countries';
 import { ProcessedRecord } from './preprocessing';
 import { getPersonality, StoryPersonality } from './personality';
+import { AMBIENT_ARTIST_SHARE, AMBIENT_PHRASES } from './ambientPhrases.mjs';
 
 /**
  * Data for the "Your Unwrapped Story" mode (see unwrapped_story_planning.md, Step A).
@@ -263,42 +264,7 @@ export function isStoryEligible(records: ProcessedRecord[], year: number): boole
   return storyYears(records).some(y => y.year === year && y.eligible);
 }
 
-/**
- * Phrases that only show up in ambient / sleep-sound releases. Deliberately strict: single words like
- * "rain", "birds", "ocean" or "sleep" also appear in real songs ("Ocean Eyes", "Birds", Vancouver Sleep Clinic),
- * so they are not enough on their own. Matched against "artist | album | track".
- */
-const AMBIENT_PHRASES = new RegExp(
-  [
-    'rain ?sounds?',
-    'sounds? of (the )?(rain|nature|ocean|forest|thunder)',
-    'nature sounds?',
-    '(white|brown|pink|green) noise',
-    'thunder ?storms?',
-    'rain(fall)? (and|&) thunder',
-    'heavy rain',
-    'gentle rain',
-    'rainstorm',
-    'for (deep )?sleep(ing)?',
-    'sleep sounds?',
-    'sleep (&|and) relax',
-    'relaxing sounds?',
-    'ambien(ce|t sounds?)',
-    'asmr',
-    'binaural',
-    'cricket sounds?',
-    'forest rain',
-    'rain ?forest',
-    'rainforest sounds?',
-    'ocean waves',
-    'fan noise',
-    // Not "\d+ Hz" on its own: pop releases use it too (JVKE, "… feels like (554Hz)").
-  ].join('|'),
-  'i'
-);
-
-/** An artist counts as ambient when at least this share of their listening matches `AMBIENT_PHRASES`. */
-const AMBIENT_ARTIST_SHARE = 0.5;
+// Ambient phrases and the artist rule live in ./ambientPhrases.mjs (shared with scripts/build-demo-history.mjs).
 
 export interface AmbientSet {
   artists: Set<string>;

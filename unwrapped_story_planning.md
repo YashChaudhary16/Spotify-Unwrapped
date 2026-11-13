@@ -25,6 +25,7 @@ This file plans the next big body of work in two parts, built in this order:
 | Honesty | **No percentile claims** against other listeners ("top 0.5% of fans"): we have no data from other users. Never fake a comparison. |
 | Audio features | **Don't use** Spotify's audio-features API (danceability, valence, …). It was deprecated for new apps in late 2024. |
 | Story scope | One story per calendar year, using the **full year** (Wrapped stops around October; we don't). *(proposed)* |
+| Demo data | "Try with sample data" uses the **creator's real 2024** (user decision 2026-11-12), published in `public/demo/history-2024.json` and committed. **Removed before publishing:** IP addresses, private-session plays, sleep/ambient sounds (auto-detected + Nature Therapy), unused fields. **Kept:** countries and device names. Rebuild with `node scripts/build-demo-history.mjs --input <export folder>`. |
 | Minimum data | A year needs at least ~10 hours and 30 active days to get a story; otherwise its "Play story" button is hidden. *(proposed — tune on real data)* |
 | Story palette | **Hybrid** (user decision 2026-11-12). Number cards use bold, flat color blocks with a simple shape and their own black or white ink. Artwork cards use the cover's or artist's color. Story mode only; the dashboard keeps its rules. Secondary text on story cards is at least 75% ink, for contrast. |
 | Private sessions | Plays with `incognito_mode` **count toward totals** (time, plays, active days) but are **never named or ranked** in the story. User decision 2026-11-12. |
@@ -165,9 +166,9 @@ Goal: a complete, short story.
 
 **Done when:** a PNG is downloaded or shared on desktop and mobile and looks right with long names, missing artwork and every time unit.
 
-### Step J — Sample-data story
-- [ ] The story works fully on "Try with sample data" (no track IDs → gradient art), so a recruiter or engineer can try it without requesting their own data.
-- [ ] Sample data is shaped so the demo story is interesting (a clear personality, a discovery, a comeback).
+### Step J — Sample-data story ✅ (2026-11-12; changed approach: real data instead of generated)
+- [x] The story works fully on "Try with sample data", so a recruiter or engineer can try it without requesting their own data. **The demo is now a real year (the creator's 2024)** with Spotify IDs, so covers, artist photos, players and background music all work.
+- [x] ~~Sample data is shaped so the demo story is interesting~~: replaced by real data (user decision). The demo has only one year, so "new to you", comeback and year-over-year cards don't appear in it.
 
 **Done when:** the sample story is fun to tap through.
 
@@ -275,6 +276,43 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step J: real demo history instead of fictional sample data
+**Decisions (user)**
+- The demo is the user's **real 2024**, not generated data.
+- **Remove** private-session plays and sleep/ambient sounds (IP addresses always). **Keep** countries and device names.
+- **Commit** the file to the repo.
+
+**Done**
+- `scripts/build-demo-history.mjs` (run locally on the export folder; no data passes through the chat):
+  - Reads every `Streaming_History_Audio_*.json` and keeps music only.
+  - Detects ambient sounds over the whole history with the story's rules, plus `--hide` (default "Nature Therapy").
+  - Keeps the year ± 1 day (for timezones), and drops private sessions and ambient plays.
+  - Writes compact JSON with lookup tables and delta-encoded timestamps.
+  - Result for 2024: 45,072 plays → **44,082 kept** (990 ambient removed, 0 private sessions that year). 4,221 tracks, 3 countries, 1,541 KB raw / **442 KB gzipped**. The file contains no `ip_addr` or `incognito` fields.
+- `lib/ambientPhrases.mjs`: the phrase list and artist rule moved out of `lib/story.ts`, so the app and the script share one definition.
+- `lib/demoHistory.ts`: fetches the file only when the demo is opened and expands it into normal export records. `app/page.tsx` preprocesses them and keeps local-time 2024 only.
+- The sample banner now says it's a real year (2024) from the person who built Unwrapped, with private sessions and sleep sounds left out.
+- Removed `lib/sampleData.ts` (the fictional generator). Updated `CLAUDE.md`'s map and the old "sample data has no track IDs" note in `PLANNING.md`.
+
+**Checked**
+- Decoding the demo gives 43,939 records, all in 2024 (local time), in ~0.66 s in Node.
+- Its story matches the real export's 2024: Hans Zimmer, "Organ Variation", Interstellar, The Repeat Offender. Total time is 2,063 vs 2,101 hrs, because the ambient plays are removed from the file instead of hidden.
+- Demo cards: intro → total → top artist → top songs → top album → seasons → months → on repeat → longest session → time of day → countries → personality → summary. All top songs have Spotify IDs.
+- On a local production server the file is served as `application/json`, gzipped (~450 KB). The server was stopped by its port PID.
+- `tsc`, `next lint` and `next build` pass.
+
+**Changed files**
+- New: `scripts/build-demo-history.mjs`, `lib/ambientPhrases.mjs`, `lib/demoHistory.ts`, `public/demo/history-2024.json`
+- Updated: `lib/story.ts`, `app/page.tsx`, `components/Dashboard.tsx`, `CLAUDE.md`, `PLANNING.md`
+- Deleted: `lib/sampleData.ts`
+
+**Notes / decisions**
+- **The demo is public:** anyone on the site (and the repo) can see this 2024 listening, including countries (India, the US, Qatar) and device names.
+- Not clicked through in a browser here.
+
+**Next**
+- Step K: QA and hardening.
 
 ### 2026-11-12 — Step I: share image
 **Decisions (user)**

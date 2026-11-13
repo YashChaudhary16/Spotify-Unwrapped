@@ -110,7 +110,7 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - Regenerate `lib/countryTimezones.ts` when the tz database changes: `node scripts/generate-country-timezones.mjs`.
 - ~~Milestones computed in O(n²)~~ — fixed 2026-11-09 (running sum)
 - Album selection resets when leaving the Albums tab (could lift into Dashboard state)
-- Sample data has no Spotify track IDs, so the Top Tracks players don't appear in the demo (by design: no real tracks)
+- ~~Sample data has no Spotify track IDs, so the Top Tracks players don't appear in the demo~~: the demo is now a real year with IDs (2026-11-12)
 - ~~`calculateAnalytics` crashes with zero playable tracks~~ — guarded 2026-11-09
 - Weekday averages and the month × weekday heatmap sum all years together; consider normalizing by how many of each day occur
 - ~~**Bug:** `weekdayHours` was weighted by play count~~ — fixed 2026-11-09 (see Work Log).
@@ -132,6 +132,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 **Next**
 - …
 -->
+
+### 2026-11-12 — Real demo history (story Step J)
+- "Try with sample data" now loads the creator's real 2024 (`public/demo/history-2024.json`, built by `scripts/build-demo-history.mjs`; private sessions, sleep sounds and IPs removed). The fictional generator `lib/sampleData.ts` is gone. Details are in `unwrapped_story_planning.md` → Work Log.
 
 ### 2026-11-12 — Story Step I (share image)
 - Bold-poster share image drawn on a canvas (9:16 and 1:1, top-4 covers, time, top artist, personality, site footer) with a share sheet (Share / Download / Copy) from the summary card. Details are in `unwrapped_story_planning.md` → Work Log.

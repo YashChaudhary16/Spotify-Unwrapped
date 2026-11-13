@@ -343,7 +343,7 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
             <p className="text-sm text-white">
               <span className="font-semibold">You&apos;re viewing sample data.</span>{' '}
               <span className="text-spotify-lightgray">
-                Two years of made-up listening by fictional artists. Upload your own export to see yours.
+                A sample dataset from a real user.
               </span>
             </p>
             <button

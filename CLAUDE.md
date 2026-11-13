@@ -19,7 +19,7 @@ Unwrapped: a privacy-first dashboard for Spotify extended streaming history (Nex
 - `lib/analytics.ts`: all dashboard numbers
 - `components/Dashboard.tsx`: tabs and the header filter bar; sections live in `components/`; shared UI in `components/ui/`; charts in `components/charts/`
 - Spotify artwork without login: `lib/useSpotifyArtwork.ts` (oEmbed, client) and `app/api/spotify/artist/route.ts` with `lib/server/commonsBanner.ts` (artist photo and colors, free-licensed Wikimedia banners)
-- `lib/sampleData.ts`: seeded fake history for "Try with sample data"
+- "Try with sample data": a real year (2024) of the creator's history in `public/demo/history-2024.json`, built by `scripts/build-demo-history.mjs` (drops private sessions, sleep sounds and IPs) and decoded by `lib/demoHistory.ts`
 - `app/api/preprocess`: unused; leave it alone
 
 ## Testing gotcha
