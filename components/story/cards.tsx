@@ -69,7 +69,8 @@ const Headline = ({ children, size = 'lg' }: { children: ReactNode; size?: 'md' 
   const cls = size === 'xl' ? 'text-[17cqw]' : size === 'lg' ? 'text-[11cqw]' : 'text-[8.5cqw]';
   return (
     <p
-      className={`mt-3 break-words font-extrabold leading-[1.02] tracking-tight text-ink motion-safe:animate-[story-rise_600ms_ease-out_both] [animation-delay:120ms] ${cls}`}
+      dir="auto"
+      className={`mt-3 line-clamp-3 break-words font-extrabold leading-[1.02] tracking-tight text-ink motion-safe:animate-[story-rise_600ms_ease-out_both] [animation-delay:120ms] ${cls}`}
     >
       {children}
     </p>
@@ -110,10 +111,13 @@ function TrackRow({
       {rank !== undefined && (
         <span className="w-[6cqw] shrink-0 text-right text-[5.5cqw] font-extrabold tabular-nums text-ink/75">{rank}</span>
       )}
-      <Cover trackId={track.trackId} alt={`Cover art for ${track.track}`} className={coverClass} />
+      {/* Decorative: the song name is right next to it. */}
+      <Cover trackId={track.trackId} alt="" className={coverClass} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[4.4cqw] font-bold text-ink">{track.track}</span>
-        <span className="block truncate text-[3.6cqw] text-ink/75">
+        <span dir="auto" className="block truncate text-[4.4cqw] font-bold text-ink">
+          {track.track}
+        </span>
+        <span dir="auto" className="block truncate text-[3.6cqw] text-ink/75">
           {[track.artist, meta].filter(Boolean).join(' · ')}
         </span>
       </span>
@@ -225,6 +229,24 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
     ),
   });
 
+  // Every play this year was private or left out: nothing to name. Close gently instead of empty cards
+  // (and, per the "no mention" decision, without saying how much was left out or why).
+  if (!story.topArtist && story.topTracks.length === 0) {
+    core.push({
+      id: 'all-yours',
+      label: 'The rest of this year stays between you and your headphones',
+      content: (
+        <CardFrame bold="plum" shape="blob">
+          <div className="my-auto">
+            <Kicker>The rest is yours</Kicker>
+            <Headline size="lg">Just for you.</Headline>
+            <Body>The rest of this year stays between you and your headphones.</Body>
+          </div>
+        </CardFrame>
+      ),
+    });
+  }
+
   // 3. Top artist
   const artist = story.topArtist;
   if (artist) {
@@ -242,7 +264,10 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
           </div>
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="break-words text-[10cqw] font-extrabold leading-[1.02] tracking-tight text-ink">
+              <p
+                dir="auto"
+                className="line-clamp-3 break-words text-[10cqw] font-extrabold leading-[1.02] tracking-tight text-ink"
+              >
                 {artist.name}
               </p>
               <p className="mt-3 text-[4.4cqw] text-ink/85">
@@ -313,10 +338,17 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
               drift
             />
           </div>
-          <p className="line-clamp-3 break-words text-[8.5cqw] font-extrabold leading-[1.05] tracking-tight text-ink">
+          <p
+            dir="auto"
+            className="line-clamp-3 break-words text-[8.5cqw] font-extrabold leading-[1.05] tracking-tight text-ink"
+          >
             {album.album}
           </p>
-          {album.artist && <p className="mt-1 truncate text-[4.6cqw] text-ink/85">{album.artist}</p>}
+          {album.artist && (
+            <p dir="auto" className="mt-1 truncate text-[4.6cqw] text-ink/85">
+              {album.artist}
+            </p>
+          )}
           <p className="mt-3 text-[4cqw] text-ink/75">
             {d(album.hours)} · {formatNumber(album.plays)} plays across {album.uniqueTracks} songs
           </p>
@@ -374,7 +406,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
                   <span className="w-[10cqw] shrink-0 text-[3.6cqw] font-bold uppercase tracking-wider text-ink/75">
                     {MONTHS[m.month - 1]}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[4cqw] text-ink">
+                  <span dir="auto" className="min-w-0 flex-1 truncate text-[4cqw] text-ink">
                     <span className="font-bold">{m.track.track}</span>
                     {m.track.artist && <span className="text-ink/75"> · {m.track.artist}</span>}
                   </span>
@@ -577,7 +609,10 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
             </div>
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <p className="break-words text-[8cqw] font-extrabold leading-[1.05] tracking-tight text-ink">
+                <p
+                  dir="auto"
+                  className="line-clamp-3 break-words text-[8cqw] font-extrabold leading-[1.05] tracking-tight text-ink"
+                >
                   {c.track.track}
                 </p>
                 <Body className="mt-3">
@@ -713,7 +748,7 @@ function SummaryCard({ story, unit, onShare }: { story: StoryData; unit: TimeUni
       <div className="grid grid-cols-2 gap-x-4 gap-y-5">
         <div className="min-w-0">
           <p className="text-[3.4cqw] font-semibold text-ink/75">Top artist</p>
-          <p className="mt-1 line-clamp-2 break-words text-[4.6cqw] font-bold leading-tight text-ink">
+          <p dir="auto" className="mt-1 line-clamp-2 break-words text-[4.6cqw] font-bold leading-tight text-ink">
             {artist?.name ?? '—'}
           </p>
         </div>
@@ -723,17 +758,21 @@ function SummaryCard({ story, unit, onShare }: { story: StoryData; unit: TimeUni
             {formatDuration(story.totalHours, unit)}
           </p>
         </div>
-        <div className="col-span-2 min-w-0">
-          <p className="text-[3.4cqw] font-semibold text-ink/75">Top songs</p>
-          <ol className="mt-1 space-y-0.5">
-            {story.topTracks.map((t, i) => (
-              <li key={`${t.track}-${t.artist}`} className="flex gap-2 text-[4.2cqw] leading-snug text-ink">
-                <span className="w-[4cqw] shrink-0 font-bold tabular-nums text-ink/75">{i + 1}</span>
-                <span className="min-w-0 truncate font-semibold">{t.track}</span>
-              </li>
-            ))}
-          </ol>
-        </div>
+        {story.topTracks.length > 0 && (
+          <div className="col-span-2 min-w-0">
+            <p className="text-[3.4cqw] font-semibold text-ink/75">Top songs</p>
+            <ol className="mt-1 space-y-0.5">
+              {story.topTracks.map((t, i) => (
+                <li key={`${t.track}-${t.artist}`} className="flex gap-2 text-[4.2cqw] leading-snug text-ink">
+                  <span className="w-[4cqw] shrink-0 font-bold tabular-nums text-ink/75">{i + 1}</span>
+                  <span dir="auto" className="min-w-0 truncate font-semibold">
+                    {t.track}
+                  </span>
+                </li>
+              ))}
+            </ol>
+          </div>
+        )}
         {story.personality && (
           <div className="col-span-2 min-w-0">
             <p className="text-[3.4cqw] font-semibold text-ink/75">Listening personality</p>
@@ -741,7 +780,8 @@ function SummaryCard({ story, unit, onShare }: { story: StoryData; unit: TimeUni
           </div>
         )}
       </div>
-      {onShare && (
+      {/* The poster is built from the top songs, so there's nothing to share without them. */}
+      {onShare && story.topTracks.length > 0 && (
         <button
           type="button"
           onClick={onShare}

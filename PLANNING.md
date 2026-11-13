@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step K (QA and hardening)
+- Edge-case run (10 synthetic histories), "Just for you." card for all-private years, line clamps and `dir="auto"` for long and right-to-left names, cached stories (Play is instant after the idle warm-up), and accessibility fixes. Story mode (Part 1) is complete. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Real demo history (story Step J)
 - "Try with sample data" now loads the creator's real 2024 (`public/demo/history-2024.json`, built by `scripts/build-demo-history.mjs`; private sessions, sleep sounds and IPs removed). The fictional generator `lib/sampleData.ts` is gone. Details are in `unwrapped_story_planning.md` → Work Log.
 

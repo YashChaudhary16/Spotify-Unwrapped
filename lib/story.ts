@@ -857,6 +857,25 @@ function buildStats(
  * years. Returns null when the year has no listening at all (check eligibility with `storyYears`).
  */
 export function buildStory(records: ProcessedRecord[], year: number, options: StoryOptions = {}): StoryData | null {
+  // Finished stories are cached per records array, year and hide list, so the dashboard's idle warm-up makes
+  // pressing Play instant. A few entries are enough (one per year the viewer opens, plus recent hide lists).
+  const key = `${year}|${optionsKey(options)}`;
+  let perRecords = storyCache.get(records);
+  if (perRecords?.has(key)) return perRecords.get(key)!;
+  const story = computeStory(records, year, options);
+  if (!perRecords) {
+    perRecords = new Map();
+    storyCache.set(records, perRecords);
+  }
+  if (perRecords.size >= STORY_CACHE_SIZE) perRecords.delete(perRecords.keys().next().value as string);
+  perRecords.set(key, story);
+  return story;
+}
+
+const STORY_CACHE_SIZE = 12;
+const storyCache = new WeakMap<ProcessedRecord[], Map<string, StoryData | null>>();
+
+function computeStory(records: ProcessedRecord[], year: number, options: StoryOptions): StoryData | null {
   const hidden = visibility(records, options);
   const visible: ProcessedRecord[] = [];
   const leftOut: StoryLeftOut = { hours: 0, plays: 0, privateHours: 0, ambientHours: 0 };

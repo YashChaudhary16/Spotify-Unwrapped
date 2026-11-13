@@ -13,6 +13,7 @@ export function LeaveOutMenu({ label, onLeaveOut }: { label: string; onLeaveOut:
   const hold = useStoryHold();
   const id = useId();
   const rootRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     hold(id, open);
@@ -28,6 +29,7 @@ export function LeaveOutMenu({ label, onLeaveOut }: { label: string; onLeaveOut:
       if (e.key === 'Escape') {
         e.stopPropagation();
         setOpen(false);
+        buttonRef.current?.focus(); // don't strand keyboard focus on the removed menu
       }
     };
     document.addEventListener('pointerdown', onDown);
@@ -41,6 +43,7 @@ export function LeaveOutMenu({ label, onLeaveOut }: { label: string; onLeaveOut:
   return (
     <div ref={rootRef} className="relative shrink-0" data-story-interactive>
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(o => !o)}
         aria-haspopup="menu"

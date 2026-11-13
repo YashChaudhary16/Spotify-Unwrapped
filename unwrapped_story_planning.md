@@ -172,11 +172,11 @@ Goal: a complete, short story.
 
 **Done when:** the sample story is fun to tap through.
 
-### Step K — QA and hardening
-- [ ] Edge cases: first/partial year, a year with one artist, only offline plays, all plays in incognito or ambient (nothing left to name: show a gentle empty card instead of a broken story), very long names, RTL and non-Latin names.
-- [ ] Performance: no jank on a mid-range phone; artwork requests capped and cached.
-- [ ] Accessibility pass (keyboard only, screen reader read-through, reduced motion).
-- [ ] `tsc`, `next lint`, `next build`; viewed in a browser on mobile and desktop.
+### Step K — QA and hardening ✅ (2026-11-12; in-browser check of the latest fixes still with the user)
+- [x] Edge cases: first/partial year, a year with one artist, only offline plays, all plays in incognito or ambient (nothing left to name: show a gentle empty card instead of a broken story), very long names, RTL and non-Latin names.
+- [x] Performance: no jank on a mid-range phone; artwork requests capped and cached. (Measured in Node on 279k plays; see the Work Log.)
+- [x] Accessibility pass (keyboard only, screen reader read-through, reduced motion). Done as a code review plus fixes; a real screen-reader run-through is still worth doing.
+- [x] `tsc`, `next lint`, `next build`; viewed in a browser on mobile and desktop. (The user has checked Steps D–J on localhost; the Step K fixes still need a look.)
 
 **Done when:** all checks pass and the user has reviewed it in a browser.
 
@@ -277,6 +277,61 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 - …
 -->
 
+### 2026-11-12 — Step K: QA and hardening
+**Edge cases** (10 synthetic histories through story → cards → render in 3 units → posters, in Node)
+- All pass, with no errors:
+  - all private sessions
+  - all ambient sounds
+  - one artist (→ The Loyalist)
+  - offline only
+  - very long names (200-char artist, 140-char word-less title)
+  - Arabic, Hebrew, Japanese and Hindi names
+  - two songs only
+  - no artist names
+  - partial first year + full year
+  - a tiny year (correctly not eligible)
+- **New card "Just for you."** For a year where every play is private or ambient: "The rest of this year stays between you and your headphones." It follows the no-mention decision (no amounts, no reasons), replaces the empty artist/song/album cards, and the summary then drops "Top songs" and the Share button (the poster needs songs).
+- **Long names:** the top-artist name, comeback title and headlines (e.g. a discovery name) are clamped to 3 lines; everything else already truncated.
+- **Right-to-left and non-Latin:** `dir="auto"` on every name, so Arabic/Hebrew align and truncate on the correct side.
+  - Posters checked with a fallback font: Arabic and Hebrew shape and order correctly.
+  - In browsers the canvas uses the page's font stack (Figtree → system fonts), so CJK/Devanagari fall back to system fonts. Not testable here (no such fonts installed).
+
+**Performance** (Node, 279k plays)
+| What | Time |
+|---|---|
+| `storyYears` (dashboard mount) | 12–19 ms |
+| ambient detection (idle warm-up) | ~90 ms |
+| first `buildStory` (idle warm-up, builds the index) | ~320 ms |
+| **opening a story after the warm-up** | **146 → 0 ms** |
+| another year | ~72 ms |
+| after hiding an artist (rebuilds the index) | ~300 ms |
+| cards | 3 ms |
+| "Leave out" panel lists | ~27 ms |
+- The fix: `buildStory` now caches finished stories per records array, year and hide list (12 entries), so the idle warm-up makes Play instant.
+- Hiding an artist is still ~0.3 s here (maybe ~1 s on a phone). It's a deliberate tap, so left as is.
+- Artwork lookups: one cached oEmbed/artist request per track (about 15–20 per story); previews are cached per track.
+
+**Accessibility** (code review + fixes)
+- Song-row covers are now decorative (`alt=""`), since the name is right next to them; they had been read twice. Big covers and photos keep their alt text.
+- The ⋯ menu returns focus to its button when closed with Escape (it was stranded on the removed menu).
+- Confirmed:
+  - dialog roles and labels; focus traps and focus restore (player, panel, share sheet)
+  - live card announcements; count-ups expose the final value to screen readers
+  - Space/arrows/Esc in the player; pause control; mute control (audio > 3 s needs one)
+  - reduced motion (no auto-advance, no count-up, no rise/drift/float animations)
+  - contrast (Step H)
+- Not done: arrow-key movement inside the chip/swatch radio groups (they work with Tab + Enter/Space). A real screen-reader run-through is still worth doing.
+
+**Changed files**
+- Updated: `components/story/cards.tsx`, `components/story/LeaveOutMenu.tsx`, `lib/story.ts`
+
+**Notes / decisions**
+- The demo banner: the user rewrote it to "A sample dataset from a real user." (no year), so it didn't need `DEMO_YEAR`.
+- `tsc`, `next lint` and `next build` pass. 285 real-data cards (7 years × 3 units) render without errors.
+
+**Next**
+- Part 1 (story mode) is complete. Part 2 starts with Step L, "On this day".
+
 ### 2026-11-12 — Step J: real demo history instead of fictional sample data
 **Decisions (user)**
 - The demo is the user's **real 2024**, not generated data.
@@ -292,7 +347,7 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
   - Result for 2024: 45,072 plays → **44,082 kept** (990 ambient removed, 0 private sessions that year). 4,221 tracks, 3 countries, 1,541 KB raw / **442 KB gzipped**. The file contains no `ip_addr` or `incognito` fields.
 - `lib/ambientPhrases.mjs`: the phrase list and artist rule moved out of `lib/story.ts`, so the app and the script share one definition.
 - `lib/demoHistory.ts`: fetches the file only when the demo is opened and expands it into normal export records. `app/page.tsx` preprocesses them and keeps local-time 2024 only.
-- The sample banner now says it's a real year (2024) from the person who built Unwrapped, with private sessions and sleep sounds left out.
+- The sample banner was updated; the user then rewrote it to "A sample dataset from a real user."
 - Removed `lib/sampleData.ts` (the fictional generator). Updated `CLAUDE.md`'s map and the old "sample data has no track IDs" note in `PLANNING.md`.
 
 **Checked**
