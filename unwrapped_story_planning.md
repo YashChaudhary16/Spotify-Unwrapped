@@ -26,11 +26,11 @@ This file plans the next big body of work in two parts, built in this order:
 | Audio features | **Don't use** Spotify's audio-features API (danceability, valence, …). It was deprecated for new apps in late 2024. |
 | Story scope | One story per calendar year, using the **full year** (Wrapped stops around October; we don't). *(proposed)* |
 | Minimum data | A year needs at least ~10 hours and 30 active days to get a story; otherwise its "Play story" button is hidden. *(proposed — tune on real data)* |
-| Story palette | Inside story mode only, cards may use **bold full-bleed color blocks** (cover-art colors and a curated set of saturated backgrounds), unlike the dashboard rule that green is for data only. *(proposed — needs user OK, since it relaxes a dashboard rule)* |
+| Story palette | **Hybrid** (user decision 2026-11-12). Number cards use bold, flat color blocks with a simple shape and their own black or white ink. Artwork cards use the cover's or artist's color. Story mode only; the dashboard keeps its rules. Secondary text on story cards is at least 75% ink, for contrast. |
 | Private sessions | Plays with `incognito_mode` **count toward totals** (time, plays, active days) but are **never named or ranked** in the story. User decision 2026-11-12. |
 | Ambient / sleep sounds | Same rule as private sessions: counted in totals, never named. Detected automatically by strict phrases (`detectAmbient` in `lib/story.ts`), plus a **"Leave out of story" list** the viewer edits (Step E). User decision 2026-11-12. |
 | Left-out footnote | **No mention** in the story of how much private or ambient listening was left out; the total simply includes it. User decision 2026-11-12. |
-| Audio in story | **Undecided.** The user rejected a playable track in "First song played", so background previews in the story need an explicit yes (see Step H). |
+| Audio in story | **Sound on by default** (user decision 2026-11-12). Each song card plays its 30 s Spotify preview, with a speaker button to mute; the choice is remembered in this browser. If the browser blocks sound, the button shows "Tap for sound". |
 | Share image | Rendered on a `<canvas>` in the browser with no new dependency (cover CDN sends CORS `*`, already verified). 9:16 story size and 1:1 square. *(proposed)* |
 | Entry point | A "Play your {year} story" button on the Overview tab, plus a year picker; linkable as `#story-2025`. *(proposed)* |
 
@@ -147,12 +147,12 @@ Goal: a complete, short story.
 
 **Done when:** different years produce visibly different stories.
 
-### Step H — Visual and motion polish
-- [ ] Card backgrounds: cover-art dominant colors where there's art, otherwise a curated set of bold colors (needs the **Story palette** decision).
-- [ ] Big type (Figtree, heavy weights), tabular numbers for counters.
-- [ ] Motion: count-ups, staggered reveals, subtle parallax on artwork. All of it is skipped under `prefers-reduced-motion`.
-- [ ] Contrast check on every background (white text ≥ 4.5:1; the existing darkening approach in `useSpotifyArtwork` gives ≥ 7:1).
-- [ ] **(Needs user decision)** Optional background audio: a 30 s preview of the card's song. The embed page exposes `audioPreview.url` (seen on 2026-11-12), but it's null for some tracks. Muted by default, with a speaker toggle. Skip this item if the user says no.
+### Step H — Visual and motion polish ✅ (2026-11-12; not yet viewed or heard in a browser)
+- [x] Card backgrounds: cover-art dominant colors where there's art, otherwise a curated set of bold colors (needs the **Story palette** decision). Hybrid, see Decisions.
+- [x] Big type (Figtree, heavy weights), tabular numbers for counters.
+- [x] Motion: count-ups, staggered reveals, subtle parallax on artwork. All of it is skipped under `prefers-reduced-motion`. (Parallax was done as a slow zoom-out "drift", plus floating shapes on bold cards.)
+- [x] Contrast check on every background (white text ≥ 4.5:1; the existing darkening approach in `useSpotifyArtwork` gives ≥ 7:1). Measured values are in `components/story/palette.ts`; crimson was darkened to pass.
+- [x] **(Needs user decision)** Optional background audio: a 30 s preview of the card's song. The embed page exposes `audioPreview.url` (seen on 2026-11-12), but it's null for some tracks. Muted by default, with a speaker toggle. Skip this item if the user says no.
 
 **Done when:** the user is happy with the look on a phone and a laptop.
 
@@ -251,8 +251,8 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 ---
 
 ## Open questions (ask when the step comes up)
-- **Step D/H:** Is the bold story palette OK inside story mode?
-- **Step H:** Background song previews in the story: yes or no?
+- ~~**Step D/H:** Is the bold story palette OK inside story mode?~~ Hybrid (2026-11-12).
+- ~~**Step H:** Background song previews in the story: yes or no?~~ Yes, sound on by default (2026-11-12).
 - **Step B/C:** Any archetypes or stats to add or drop after seeing them on real data?
 - ~~**Step B/C:** Should ambient / sleep sounds count?~~ Answered 2026-11-12: counted in totals, never named (see Decisions).
 - **Step E:** Should the story also be offered for "All time" (a lifetime story), or wait for Step Q?
@@ -275,6 +275,56 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step H: visual and motion polish, background music
+**Decisions (user)**
+- **Palette: hybrid.** Bold blocks on number cards, cover and artist colors on artwork cards.
+- **Audio: sound on by default**, with a mute button.
+
+**Done**
+- **Palette** (`components/story/palette.ts`):
+  - Bold tones electric, hotpink, lime, tangerine, sky, plum, sun and crimson, each with a lighter "shape" color and an ink color (black or white).
+  - Dark tones for artwork cards.
+  - New Tailwind color **`ink`** (`rgb(var(--story-ink) / alpha)`): each card sets `--story-ink`, so every `text-ink/…`, `bg-ink/…` flips between white and black.
+- **Card colors** (`components/story/artwork.tsx`): `CardFrame` takes `bold` + `shape` (circles, arch, stripes, blob; drawn in SVG) or `dark` + cover/artist.
+  - Bold: intro electric · total hotpink · seasons sky · months sun · on repeat tangerine · longest session plum · time of day crimson · countries lime · year over year sky/plum · skips sun · personality electric.
+  - Artwork: top artist, top songs, album, discoveries, comeback, summary.
+- **Contrast**, computed with alpha blending:
+  - Full ink is ≥ 6.9:1 on every block.
+  - 75% ink is ≥ 4.5:1 on every block after crimson was darkened to `#A8102F`.
+  - 60% ink failed on most blocks, so secondary text now uses at least 75%. The time-of-day peak bar and country bars use ink instead of green.
+- **Motion** (all `motion-safe:`):
+  - `CountUp` (ease-out ~1.4 s) on total time, on-repeat plays, longest session, year over year and skips.
+  - Kicker, headline and body rise in one after another.
+  - Artwork does a slow zoom-out (`story-drift`), and the bold-card shapes float slowly (`story-float`).
+- **Background music**:
+  - New route `app/api/spotify/preview` returns a track's 30 s preview URL from its embed page (`audioPreview.url`). It only accepts `p.scdn.co` URLs and returns null for unplayable tracks. Cached for a day.
+  - The embed-page reader moved to `lib/server/spotifyEmbed.ts`, shared with the artist route.
+  - `lib/storyAudio.ts`: one shared `<audio>` element, unlocked with a silent clip **inside the Play click** (needed for Safari); preview lookups cached; sound on/off remembered in `localStorage`.
+  - `components/story/useStoryAudio.ts`:
+    - Each card's `audioTrackId` picks its song; number cards keep the previous song playing.
+    - Cross-fades between songs, pauses with the story (hold, menu, panel, hidden tab), stops on close.
+    - If the browser refuses, the speaker button shows "Tap for sound".
+  - Songs: intro → first song; top artist → their top song; top songs → #1; album → the album; discoveries, on repeat, longest session and comeback → their song; summary → #1.
+
+**Checked**
+- Local production server:
+  - The preview route returns a clip for "Jacob and the Stone - Slowed", `null` for region-locked Chunar, and 400 for a bad ID, with the cache header.
+  - The refactored artist route still returns Hans Zimmer's photo and colors.
+  - The server was stopped by its port PID.
+- All 312 cards still render without errors (every real year × 3 units + sample).
+- `tsc`, `next lint` and `next build` pass.
+
+**Changed files**
+- New: `components/story/CountUp.tsx`, `components/story/useStoryAudio.ts`, `lib/storyAudio.ts`, `lib/server/spotifyEmbed.ts`, `app/api/spotify/preview/route.ts`
+- Updated: `components/story/{palette.ts,artwork.tsx,cards.tsx,LeaveOutMenu.tsx,StoryPlayer.tsx,types.ts}`, `components/Dashboard.tsx`, `app/api/spotify/artist/route.ts`, `tailwind.config.js`, `app/globals.css`
+
+**Notes / decisions**
+- **Privacy:** preview lookups send public track IDs to our server (like the artist lookup). No listening history is sent. Audio streams from Spotify's CDN.
+- **Not viewed or heard in a browser.** Check sound starting on Play (Chrome and Safari/iOS), the cross-fades, muting, the bold colors and the count-ups.
+
+**Next**
+- Step I: share image.
 
 ### 2026-11-12 — Steps F and G: designed cards
 **Done**

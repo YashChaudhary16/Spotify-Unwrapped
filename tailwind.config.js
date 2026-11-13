@@ -9,6 +9,8 @@ module.exports = {
     extend: {
       // Spotify dark app palette — see PLANNING.md "Design tokens".
       colors: {
+        // Story cards: text/ink color set per card (white on dark cards, black on bright ones). See components/story/palette.ts.
+        ink: 'rgb(var(--story-ink, 255 255 255) / <alpha-value>)',
         spotify: {
           green: '#1ED760',        // accent: data + active state
           'green-dark': '#1DB954', // accent hover/pressed

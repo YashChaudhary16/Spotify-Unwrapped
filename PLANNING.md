@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step H (palette, motion, background music)
+- Hybrid story palette with per-card ink color (`ink` Tailwind color), count-ups and entrance motion, 30 s Spotify previews behind the cards (new `/api/spotify/preview` route, sound on by default with mute). Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Steps F and G (designed cards)
 - `components/story/cards.tsx` and helpers: the designed core cards and extra-moment cards (up to 14 per story), ⋯ "Leave out of story" menus, cover art and artist photos, cards sized in `cqw`. Details are in `unwrapped_story_planning.md` → Work Log.
 

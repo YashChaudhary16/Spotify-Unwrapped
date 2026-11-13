@@ -12,6 +12,11 @@ export interface StoryCard {
   background?: string;
   /** Image URLs to preload while the previous card is showing. */
   preload?: string[];
+  /**
+   * Song whose 30-second preview plays behind this card. Undefined keeps the previous card's song playing,
+   * so number cards don't interrupt the music.
+   */
+  audioTrackId?: string | null;
   content: ReactNode;
 }
 

@@ -46,7 +46,7 @@ export function LeaveOutMenu({ label, onLeaveOut }: { label: string; onLeaveOut:
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`More options for ${label}`}
-        className="flex h-8 w-8 items-center justify-center rounded-full text-white/70 transition-colors hover:bg-white/15 hover:text-white"
+        className="flex h-8 w-8 items-center justify-center rounded-full text-ink/75 transition-colors hover:bg-ink/15 hover:text-ink"
       >
         <Ellipsis className="h-5 w-5" aria-hidden />
       </button>

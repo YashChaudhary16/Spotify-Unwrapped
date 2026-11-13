@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CommonsBanner, findCommonsBanner } from '@/lib/server/commonsBanner';
+import { fetchEmbedEntity, ONE_DAY, SPOTIFY_ID } from '@/lib/server/spotifyEmbed';
 
 /**
  * GET /api/spotify/artist?trackId=<22-char id>&name=<artist name>
@@ -16,8 +17,7 @@ import { CommonsBanner, findCommonsBanner } from '@/lib/server/commonsBanner';
  * any failure returns 404 and the UI falls back to its plain green header.
  */
 
-const TRACK_ID = /^[A-Za-z0-9]{22}$/;
-const ONE_DAY = 60 * 60 * 24;
+const TRACK_ID = SPOTIFY_ID;
 
 type Rgb = { red: number; green: number; blue: number };
 
@@ -31,22 +31,6 @@ interface ArtistLookup {
   tintedColor: string | null;
   /** Wide, freely licensed photo from Wikimedia Commons (with attribution), if a confident match exists. */
   banner: CommonsBanner | null;
-}
-
-async function fetchEmbedData(path: string): Promise<any | null> {
-  const res = await fetch(`https://open.spotify.com/embed/${path}`, {
-    headers: { 'User-Agent': 'Mozilla/5.0 (compatible; Unwrapped/1.0)' },
-    next: { revalidate: ONE_DAY },
-  });
-  if (!res.ok) return null;
-  const html = await res.text();
-  const match = html.match(/<script id="__NEXT_DATA__" type="application\/json">([\s\S]*?)<\/script>/);
-  if (!match) return null;
-  try {
-    return JSON.parse(match[1])?.props?.pageProps?.state?.data?.entity ?? null;
-  } catch {
-    return null;
-  }
 }
 
 const rgb = (c: Rgb | undefined): string | null =>
@@ -63,7 +47,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // 1. Track → artists
-    const track = await fetchEmbedData(`track/${trackId}`);
+    const track = await fetchEmbedEntity(`track/${trackId}`);
     const artists: { name?: string; uri?: string }[] = Array.isArray(track?.artists) ? track.artists : [];
     const candidates = artists.filter(a => typeof a.uri === 'string' && a.uri.startsWith('spotify:artist:'));
     const chosen = candidates.find(a => a.name && normalize(a.name) === normalize(name)) ?? candidates[0];
@@ -73,7 +57,7 @@ export async function GET(request: NextRequest) {
 
     // 2. Artist → photo + colors (Spotify), and a freely licensed wide banner photo (Wikimedia Commons), in parallel.
     const [artist, banner] = await Promise.all([
-      fetchEmbedData(`artist/${artistId}`),
+      fetchEmbedEntity(`artist/${artistId}`),
       findCommonsBanner(artistId).catch(err => {
         console.error('[artist banner] Commons lookup failed:', err);
         return null;

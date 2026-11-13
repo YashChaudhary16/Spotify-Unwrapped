@@ -27,6 +27,7 @@ import ArtistPicker from './ArtistPicker';
 import AlbumAnalytics from './AlbumAnalytics';
 import { buildStory, detectAmbient, storyHideCandidates, storyTrackKey, storyYears } from '@/lib/story';
 import { useStoryHidden } from '@/lib/useStoryHidden';
+import { unlockStoryAudio } from '@/lib/storyAudio';
 import { StoryPlayer } from './story/StoryPlayer';
 import { StoryHero } from './story/StoryHero';
 import { LeaveOutPanel } from './story/LeaveOutPanel';
@@ -109,6 +110,8 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
   }, [eligibleStoryYears]);
 
   const openStory = useCallback((year: number) => {
+    // Runs inside the Play click, which is when browsers allow sound to start.
+    unlockStoryAudio();
     try {
       window.history.pushState(null, '', `#story-${year}`);
       pushedStory.current = true;

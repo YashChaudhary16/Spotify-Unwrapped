@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronLeft, ChevronRight, EyeOff, Pause, Play, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, EyeOff, Pause, Play, Volume2, VolumeX, X } from 'lucide-react';
 import { DEFAULT_CARD_MS, type StoryCard } from './types';
 import { StoryHoldContext } from './context';
+import { useStoryAudio } from './useStoryAudio';
 
 interface StoryPlayerProps {
   /** Accessible name of the dialog, e.g. "Your 2025 story". */
@@ -70,6 +71,7 @@ export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = fal
   const card = cards[index];
   const isLast = index === count - 1;
   const paused = userPaused || held || tabHidden || suspended || holds.length > 0;
+  const { soundOn, blocked, toggleSound } = useStoryAudio(cards, Math.min(index, count - 1), paused);
 
   const next = useCallback(() => setIndex(i => Math.min(i + 1, count - 1)), [count]);
   const prev = useCallback(() => setIndex(i => Math.max(i - 1, 0)), []);
@@ -256,6 +258,18 @@ export function StoryPlayer({ title, cards, onClose, onLeaveOut, suspended = fal
           <div className="mt-3 flex items-center justify-between gap-2">
             <span className="truncate text-sm font-semibold text-white/90">{title}</span>
             <div className="flex shrink-0 items-center gap-1">
+              <button
+                type="button"
+                onClick={toggleSound}
+                aria-label={blocked ? 'Turn on sound' : soundOn ? 'Mute music' : 'Play music'}
+                aria-pressed={soundOn}
+                className={`flex h-9 items-center justify-center gap-1.5 rounded-full text-white transition-colors hover:bg-white/15 ${
+                  blocked ? 'bg-white/15 px-3' : 'w-9'
+                }`}
+              >
+                {soundOn ? <Volume2 className="h-5 w-5" aria-hidden /> : <VolumeX className="h-5 w-5" aria-hidden />}
+                {blocked && <span className="text-xs font-semibold">Tap for sound</span>}
+              </button>
               {onLeaveOut && (
                 <button
                   type="button"

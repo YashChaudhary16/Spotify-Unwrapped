@@ -29,7 +29,8 @@ import type { PersonalityIcon } from '@/lib/personality';
 import { formatDate, formatDuration, formatNumber, formatPercent, type TimeUnit } from '@/lib/format';
 import { prefetchSpotifyArtwork } from '@/lib/useSpotifyArtwork';
 import { prefetchSpotifyArtist } from '@/lib/useSpotifyArtist';
-import { ArtistPhoto, CardBackground, CardFrame, Cover } from './artwork';
+import { ArtistPhoto, CardFrame, Cover } from './artwork';
+import { CountUp } from './CountUp';
 import { LeaveOutMenu } from './LeaveOutMenu';
 import type { StoryCard } from './types';
 
@@ -54,7 +55,7 @@ const MAX_CARDS = 14;
 // ── Small text pieces ──────────────────────────────────────────────────────────
 
 const Kicker = ({ children, icon: Icon }: { children: ReactNode; icon?: LucideIcon }) => (
-  <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.14em] text-white/75">
+  <p className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.14em] text-ink/75 motion-safe:animate-[story-rise_500ms_ease-out_both]">
     {Icon && <Icon className="h-4 w-4" aria-hidden />}
     {children}
   </p>
@@ -64,16 +65,24 @@ const Kicker = ({ children, icon: Icon }: { children: ReactNode; icon?: LucideIc
 const Headline = ({ children, size = 'lg' }: { children: ReactNode; size?: 'md' | 'lg' | 'xl' }) => {
   const cls = size === 'xl' ? 'text-[17cqw]' : size === 'lg' ? 'text-[11cqw]' : 'text-[8.5cqw]';
   return (
-    <p className={`mt-3 break-words font-extrabold leading-[1.02] tracking-tight text-white ${cls}`}>{children}</p>
+    <p
+      className={`mt-3 break-words font-extrabold leading-[1.02] tracking-tight text-ink motion-safe:animate-[story-rise_600ms_ease-out_both] [animation-delay:120ms] ${cls}`}
+    >
+      {children}
+    </p>
   );
 };
 
 const Body = ({ children, className = '' }: { children: ReactNode; className?: string }) => (
-  <p className={`mt-4 text-[4.6cqw] leading-snug text-white/85 ${className}`}>{children}</p>
+  <p
+    className={`mt-4 text-[4.6cqw] leading-snug text-ink/85 motion-safe:animate-[story-rise_600ms_ease-out_both] [animation-delay:300ms] ${className}`}
+  >
+    {children}
+  </p>
 );
 
 const Pill = ({ children }: { children: ReactNode }) => (
-  <span className="inline-flex items-center rounded-full bg-black/30 px-3 py-1.5 text-[3.6cqw] font-semibold text-white">
+  <span className="inline-flex items-center rounded-full bg-ink/15 px-3 py-1.5 text-[3.6cqw] font-semibold text-ink">
     {children}
   </span>
 );
@@ -96,12 +105,12 @@ function TrackRow({
   return (
     <div className="flex items-center gap-3">
       {rank !== undefined && (
-        <span className="w-[6cqw] shrink-0 text-right text-[5.5cqw] font-extrabold tabular-nums text-white/70">{rank}</span>
+        <span className="w-[6cqw] shrink-0 text-right text-[5.5cqw] font-extrabold tabular-nums text-ink/75">{rank}</span>
       )}
       <Cover trackId={track.trackId} alt={`Cover art for ${track.track}`} className={coverClass} />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[4.4cqw] font-bold text-white">{track.track}</span>
-        <span className="block truncate text-[3.6cqw] text-white/75">
+        <span className="block truncate text-[4.4cqw] font-bold text-ink">{track.track}</span>
+        <span className="block truncate text-[3.6cqw] text-ink/75">
           {[track.artist, meta].filter(Boolean).join(' · ')}
         </span>
       </span>
@@ -157,10 +166,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
   // 1. Intro
   core.push({
     id: 'intro',
+    audioTrackId: story.firstSong?.trackId ?? story.topTracks[0]?.trackId ?? null,
     label: `${story.year}, unwrapped`,
     durationMs: 5000,
     content: (
-      <CardFrame background={<CardBackground tone="violet" />}>
+      <CardFrame bold="electric" shape="circles">
         <div className="my-auto">
           <Kicker>Your year in music</Kicker>
           <Headline size="xl">
@@ -174,7 +184,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         </div>
         {story.firstSong && (
           <div className="mt-6">
-            <p className="mb-3 text-[3.8cqw] font-semibold text-white/75">
+            <p className="mb-3 text-[3.8cqw] font-semibold text-ink/75">
               It all started on {formatDate(story.firstSong.date, 'MMMM d')} with
             </p>
             <TrackRow
@@ -193,11 +203,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
     id: 'total',
     label: `You listened for ${d(story.totalHours)}`,
     content: (
-      <CardFrame background={<CardBackground tone="green" />}>
+      <CardFrame bold="hotpink" shape="arch">
         <div className="my-auto">
           <Kicker>This year you listened for</Kicker>
           <Headline size="lg">
-            <span className="tabular-nums">{d(story.totalHours)}</span>
+            <CountUp value={story.totalHours} format={d} />
           </Headline>
           {equivalent && <Body>That&apos;s {equivalent.label}.</Body>}
           <div className="mt-8 flex flex-wrap gap-2">
@@ -218,24 +228,25 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
     const artistTrackId = artist.topTrack?.trackId ?? null;
     core.push({
       id: 'top-artist',
+      audioTrackId: artistTrackId,
       label: `Your top artist: ${artist.name}`,
       durationMs: 8000,
       content: (
-        <CardFrame background={<CardBackground tone="rose" trackId={artistTrackId} artist={artist.name} />}>
+        <CardFrame dark="rose" trackId={artistTrackId} artist={artist.name}>
           <Kicker>Your top artist</Kicker>
           <div className="flex flex-1 flex-col items-center justify-center py-4">
             <ArtistPhoto trackId={artistTrackId} name={artist.name} className="h-[58cqw] w-[58cqw]" />
           </div>
           <div className="flex items-start gap-2">
             <div className="min-w-0 flex-1">
-              <p className="break-words text-[10cqw] font-extrabold leading-[1.02] tracking-tight text-white">
+              <p className="break-words text-[10cqw] font-extrabold leading-[1.02] tracking-tight text-ink">
                 {artist.name}
               </p>
-              <p className="mt-3 text-[4.4cqw] text-white/85">
+              <p className="mt-3 text-[4.4cqw] text-ink/85">
                 {d(artist.hours)} · {formatPercent(artist.share)} of your listening
               </p>
               {s.loyalty && (
-                <p className="mt-1 text-[4cqw] font-semibold text-white">
+                <p className="mt-1 text-[4cqw] font-semibold text-ink">
                   Your #1 for {s.loyalty.years} years running
                 </p>
               )}
@@ -252,10 +263,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
     const n = story.topTracks.length;
     core.push({
       id: 'top-songs',
+      audioTrackId: story.topTracks[0].trackId,
       label: `Your top songs: ${story.topTracks.map((t, i) => `${i + 1}. ${t.track}`).join(', ')}`,
       durationMs: 6000 + n * 700,
       content: (
-        <CardFrame background={<CardBackground tone="blue" trackId={story.topTracks[0].trackId} />}>
+        <CardFrame dark="blue" trackId={story.topTracks[0].trackId}>
           <Kicker>Your top songs</Kicker>
           <ol className="my-auto space-y-[4cqw]">
             {story.topTracks.map((t, i) => (
@@ -284,9 +296,10 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
   if (album) {
     core.push({
       id: 'top-album',
+      audioTrackId: album.trackId,
       label: `Your top album: ${album.album}`,
       content: (
-        <CardFrame background={<CardBackground tone="amber" trackId={album.trackId} />}>
+        <CardFrame dark="amber" trackId={album.trackId}>
           <Kicker icon={Disc3}>Your top album</Kicker>
           <div className="flex flex-1 items-center justify-center py-4">
             <Cover
@@ -294,13 +307,14 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
               alt={`Cover art for ${album.album}`}
               className="h-[66cqw] w-[66cqw] shadow-2xl shadow-black/60"
               rounded="rounded-lg"
+              drift
             />
           </div>
-          <p className="line-clamp-3 break-words text-[8.5cqw] font-extrabold leading-[1.05] tracking-tight text-white">
+          <p className="line-clamp-3 break-words text-[8.5cqw] font-extrabold leading-[1.05] tracking-tight text-ink">
             {album.album}
           </p>
-          {album.artist && <p className="mt-1 truncate text-[4.6cqw] text-white/85">{album.artist}</p>}
-          <p className="mt-3 text-[4cqw] text-white/75">
+          {album.artist && <p className="mt-1 truncate text-[4.6cqw] text-ink/85">{album.artist}</p>}
+          <p className="mt-3 text-[4cqw] text-ink/75">
             {d(album.hours)} · {formatNumber(album.plays)} plays across {album.uniqueTracks} songs
           </p>
         </CardFrame>
@@ -319,14 +333,14 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         label: `Your songs of the seasons: ${s.seasons.map(x => `${SEASON[x.season].label}, ${x.track.track}`).join('; ')}`,
         durationMs: 8000,
         content: (
-          <CardFrame background={<CardBackground tone="teal" />}>
+          <CardFrame bold="sky" shape="stripes">
             <Kicker>Your year in seasons</Kicker>
             <ul className="my-auto space-y-[5cqw]">
               {s.seasons.map(x => {
                 const { label, icon: Icon } = SEASON[x.season];
                 return (
                   <li key={x.season}>
-                    <p className="mb-2 flex items-center gap-2 text-[3.6cqw] font-bold uppercase tracking-widest text-white/70">
+                    <p className="mb-2 flex items-center gap-2 text-[3.6cqw] font-bold uppercase tracking-widest text-ink/75">
                       <Icon className="h-4 w-4" aria-hidden />
                       {label}
                     </p>
@@ -349,17 +363,17 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         label: 'Your song of each month',
         durationMs: 9000,
         content: (
-          <CardFrame background={<CardBackground tone="slate" />}>
+          <CardFrame bold="sun" shape="circles">
             <Kicker icon={CalendarDays}>Month by month</Kicker>
             <ul className="my-auto space-y-[1.6cqw]">
               {s.months.map(m => (
                 <li key={m.month} className="flex items-baseline gap-3">
-                  <span className="w-[10cqw] shrink-0 text-[3.6cqw] font-bold uppercase tracking-wider text-white/60">
+                  <span className="w-[10cqw] shrink-0 text-[3.6cqw] font-bold uppercase tracking-wider text-ink/75">
                     {MONTHS[m.month - 1]}
                   </span>
-                  <span className="min-w-0 flex-1 truncate text-[4cqw] text-white">
+                  <span className="min-w-0 flex-1 truncate text-[4cqw] text-ink">
                     <span className="font-bold">{m.track.track}</span>
-                    {m.track.artist && <span className="text-white/70"> · {m.track.artist}</span>}
+                    {m.track.artist && <span className="text-ink/75"> · {m.track.artist}</span>}
                   </span>
                 </li>
               ))}
@@ -376,10 +390,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
       score: Math.min(1, 0.65 + 0.08 * s.discoveries.length),
       card: {
         id: 'discoveries',
+        audioTrackId: lead.topTrack?.trackId,
         label: `New to you in ${story.year}: ${s.discoveries.map(x => x.name).join(', ')}`,
         durationMs: 8000,
         content: (
-          <CardFrame background={<CardBackground tone="violet" trackId={lead.topTrack?.trackId} artist={lead.name} />}>
+          <CardFrame dark="violet" trackId={lead.topTrack?.trackId} artist={lead.name}>
             <Kicker icon={Compass}>New to you</Kicker>
             <div className="flex flex-1 flex-col justify-center py-4">
               <ArtistPhoto trackId={lead.topTrack?.trackId ?? null} name={lead.name} className="h-[40cqw] w-[40cqw]" />
@@ -395,7 +410,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
               </div>
             </div>
             {rest.length > 0 && (
-              <p className="text-[3.8cqw] text-white/75">
+              <p className="text-[3.8cqw] text-ink/75">
                 Also new: {rest.slice(0, 3).map(x => `${x.name} (#${x.rank})`).join(', ')}
               </p>
             )}
@@ -411,13 +426,14 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
       score: Math.min(1, 0.4 + r.plays / 60),
       card: {
         id: 'repeat-day',
+        audioTrackId: r.track.trackId,
         label: `On ${formatDate(r.date, 'MMMM d')} you played ${r.track.track} ${r.plays} times`,
         content: (
-          <CardFrame background={<CardBackground tone="rose" trackId={r.track.trackId} />}>
+          <CardFrame bold="tangerine" shape="blob">
             <Kicker icon={Repeat}>On repeat</Kicker>
             <div className="my-auto">
               <Headline size="xl">
-                <span className="tabular-nums">{formatNumber(r.plays)}×</span>
+                <CountUp value={r.plays} format={n => `${formatNumber(Math.round(n))}×`} durationMs={1000} />
               </Headline>
               <Body>
                 On {formatDate(r.date, 'EEEE, MMMM d')} you played {quote(r.track.track)} {formatNumber(r.plays)} times.
@@ -437,13 +453,14 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
       score: Math.min(1, 0.35 + l.hours / 15),
       card: {
         id: 'longest-session',
+        audioTrackId: l.topTrack?.trackId,
         label: `Your longest session: ${d(l.hours)} on ${formatDate(l.date, 'MMMM d')}`,
         content: (
-          <CardFrame background={<CardBackground tone="blue" trackId={l.topTrack?.trackId} />}>
+          <CardFrame bold="plum" shape="arch">
             <Kicker icon={Timer}>Your longest session</Kicker>
             <div className="my-auto">
               <Headline size="lg">
-                <span className="tabular-nums">{d(l.hours)}</span>
+                <CountUp value={l.hours} format={d} />
               </Headline>
               <Body>
                 {formatDate(l.date, 'EEEE, MMMM d')}, from {l.start} to {l.end}
@@ -452,7 +469,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
             </div>
             {l.topTrack && (
               <>
-                <p className="mb-3 text-[3.8cqw] font-semibold text-white/75">The song you kept coming back to</p>
+                <p className="mb-3 text-[3.8cqw] font-semibold text-ink/75">The song you kept coming back to</p>
                 <TrackRow track={l.topTrack} onHide={hideTrack(l.topTrack)} />
               </>
             )}
@@ -471,7 +488,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         id: 'time-of-day',
         label: `Your peak listening hour: ${hourLabel(t.peakHour)}`,
         content: (
-          <CardFrame background={<CardBackground tone="slate" />}>
+          <CardFrame bold="crimson" shape="stripes">
             <Kicker icon={t.peakHour >= 21 || t.peakHour < 5 ? Moon : Sun}>When you listened</Kicker>
             <div className="my-auto">
               <Headline size="lg">{hourLabel(t.peakHour)}</Headline>
@@ -480,12 +497,12 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
                 {t.byHour.map((h, i) => (
                   <div
                     key={i}
-                    className={`flex-1 rounded-t-sm ${i === t.peakHour ? 'bg-spotify-green' : 'bg-white/35'}`}
+                    className={`flex-1 rounded-t-sm ${i === t.peakHour ? 'bg-ink' : 'bg-ink/30'}`}
                     style={{ height: `${Math.max((h / max) * 100, 2)}%` }}
                   />
                 ))}
               </div>
-              <div className="mt-2 flex justify-between text-[3.2cqw] text-white/60" aria-hidden>
+              <div className="mt-2 flex justify-between text-[3.2cqw] text-ink/75" aria-hidden>
                 <span>12 am</span>
                 <span>6 am</span>
                 <span>12 pm</span>
@@ -508,7 +525,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         id: 'countries',
         label: `You listened in ${s.countries.length} countries: ${s.countries.map(c => c.country).join(', ')}`,
         content: (
-          <CardFrame background={<CardBackground tone="teal" />}>
+          <CardFrame bold="lime" shape="circles">
             <Kicker icon={MapPin}>Where you listened</Kicker>
             <div className="my-auto">
               <Headline size="lg">{s.countries.length} countries</Headline>
@@ -516,12 +533,12 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
                 {top.map(c => (
                   <li key={c.country}>
                     <div className="flex items-baseline justify-between gap-3 text-[4.2cqw]">
-                      <span className="truncate font-bold text-white">{c.country}</span>
-                      <span className="shrink-0 tabular-nums text-white/75">{d(c.hours)}</span>
+                      <span className="truncate font-bold text-ink">{c.country}</span>
+                      <span className="shrink-0 tabular-nums text-ink/75">{d(c.hours)}</span>
                     </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/15">
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-ink/15">
                       <div
-                        className="h-full rounded-full bg-spotify-green"
+                        className="h-full rounded-full bg-ink"
                         style={{ width: `${Math.max((c.hours / max) * 100, 2)}%` }}
                       />
                     </div>
@@ -541,9 +558,10 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
       score: 0.9,
       card: {
         id: 'comeback',
+        audioTrackId: c.track.trackId,
         label: `The comeback: ${c.track.track}`,
         content: (
-          <CardFrame background={<CardBackground tone="amber" trackId={c.track.trackId} />}>
+          <CardFrame dark="amber" trackId={c.track.trackId}>
             <Kicker icon={RotateCcw}>The comeback</Kicker>
             <div className="flex flex-1 items-center justify-center py-4">
               <Cover
@@ -551,11 +569,12 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
                 alt={`Cover art for ${c.track.track}`}
                 className="h-[56cqw] w-[56cqw] shadow-2xl shadow-black/60"
                 rounded="rounded-lg"
+                drift
               />
             </div>
             <div className="flex items-start gap-2">
               <div className="min-w-0 flex-1">
-                <p className="break-words text-[8cqw] font-extrabold leading-[1.05] tracking-tight text-white">
+                <p className="break-words text-[8cqw] font-extrabold leading-[1.05] tracking-tight text-ink">
                   {c.track.track}
                 </p>
                 <Body className="mt-3">
@@ -579,14 +598,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         id: 'year-over-year',
         label: `${formatPercent(Math.abs(y.change))} ${up ? 'more' : 'less'} listening than in ${y.previousYear}`,
         content: (
-          <CardFrame background={<CardBackground tone={up ? 'green' : 'blue'} />}>
+          <CardFrame bold={up ? 'sky' : 'plum'} shape="arch">
             <Kicker icon={up ? TrendingUp : TrendingDown}>Compared with {y.previousYear}</Kicker>
             <div className="my-auto">
               <Headline size="xl">
-                <span className="tabular-nums">
-                  {up ? '+' : '−'}
-                  {formatPercent(Math.abs(y.change))}
-                </span>
+                <CountUp value={Math.abs(y.change)} format={n => `${up ? '+' : '−'}${formatPercent(n)}`} />
               </Headline>
               <Body>
                 {up ? 'more' : 'less'} listening than in {y.previousYear}: {d(y.previousHours)} then,{' '}
@@ -608,11 +624,11 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
         id: 'skips',
         label: `You skipped ${formatPercent(k.rate)} of songs this year`,
         content: (
-          <CardFrame background={<CardBackground tone="slate" />}>
+          <CardFrame bold="sun" shape="blob">
             <Kicker icon={SkipForward}>Skip check</Kicker>
             <div className="my-auto">
               <Headline size="xl">
-                <span className="tabular-nums">{formatPercent(k.rate)}</span>
+                <CountUp value={k.rate} format={n => formatPercent(n)} />
               </Headline>
               <Body>
                 of the songs you started, you skipped. That&apos;s {more ? 'pickier' : 'more patient'} than your usual{' '}
@@ -635,15 +651,15 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
       label: `Your listening personality: ${main.title}${touch ? `, with a touch of ${touch.title}` : ''}`,
       durationMs: 9000,
       content: (
-        <CardFrame background={<CardBackground tone="violet" />}>
+        <CardFrame bold="electric" shape="blob">
           <Kicker>Your listening personality</Kicker>
           <div className="my-auto">
-            <span className="flex h-[22cqw] w-[22cqw] items-center justify-center rounded-full bg-white/15">
-              <Icon className="h-1/2 w-1/2 text-white" aria-hidden />
+            <span className="flex h-[22cqw] w-[22cqw] items-center justify-center rounded-full bg-ink/15">
+              <Icon className="h-1/2 w-1/2 text-ink" aria-hidden />
             </span>
             <Headline size="lg">{main.title}</Headline>
             {touch && (
-              <p className="mt-2 text-[4.8cqw] font-semibold text-white/85">
+              <p className="mt-2 text-[4.8cqw] font-semibold text-ink/85">
                 with a touch of {touch.title.replace(/^The /, '')}
               </p>
             )}
@@ -660,6 +676,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
   // 7. Summary (last; the future share image)
   tail.push({
     id: 'summary',
+    audioTrackId: story.topTracks[0]?.trackId,
     label: `Your ${story.year} summary`,
     durationMs: 12000,
     content: <SummaryCard story={story} unit={unit} />,
@@ -681,10 +698,8 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
 function SummaryCard({ story, unit }: { story: StoryData; unit: TimeUnit }) {
   const artist = story.topArtist;
   return (
-    <CardFrame
-      background={<CardBackground tone="green" trackId={artist?.topTrack?.trackId} artist={artist?.name} />}
-    >
-      <p className="text-[3.8cqw] font-bold uppercase tracking-[0.14em] text-white/80">{story.year} · Unwrapped</p>
+    <CardFrame dark="green" trackId={artist?.topTrack?.trackId} artist={artist?.name}>
+      <p className="text-[3.8cqw] font-bold uppercase tracking-[0.14em] text-ink/80">{story.year} · Unwrapped</p>
       <div className="flex flex-1 items-center justify-center py-3">
         {artist ? (
           <ArtistPhoto trackId={artist.topTrack?.trackId ?? null} name={artist.name} className="h-[42cqw] w-[42cqw]" />
@@ -694,23 +709,23 @@ function SummaryCard({ story, unit }: { story: StoryData; unit: TimeUnit }) {
       </div>
       <div className="grid grid-cols-2 gap-x-4 gap-y-5">
         <div className="min-w-0">
-          <p className="text-[3.4cqw] font-semibold text-white/70">Top artist</p>
-          <p className="mt-1 line-clamp-2 break-words text-[4.6cqw] font-bold leading-tight text-white">
+          <p className="text-[3.4cqw] font-semibold text-ink/75">Top artist</p>
+          <p className="mt-1 line-clamp-2 break-words text-[4.6cqw] font-bold leading-tight text-ink">
             {artist?.name ?? '—'}
           </p>
         </div>
         <div className="min-w-0">
-          <p className="text-[3.4cqw] font-semibold text-white/70">Listening time</p>
-          <p className="mt-1 text-[4.6cqw] font-bold tabular-nums leading-tight text-white">
+          <p className="text-[3.4cqw] font-semibold text-ink/75">Listening time</p>
+          <p className="mt-1 text-[4.6cqw] font-bold tabular-nums leading-tight text-ink">
             {formatDuration(story.totalHours, unit)}
           </p>
         </div>
         <div className="col-span-2 min-w-0">
-          <p className="text-[3.4cqw] font-semibold text-white/70">Top songs</p>
+          <p className="text-[3.4cqw] font-semibold text-ink/75">Top songs</p>
           <ol className="mt-1 space-y-0.5">
             {story.topTracks.map((t, i) => (
-              <li key={`${t.track}-${t.artist}`} className="flex gap-2 text-[4.2cqw] leading-snug text-white">
-                <span className="w-[4cqw] shrink-0 font-bold tabular-nums text-white/70">{i + 1}</span>
+              <li key={`${t.track}-${t.artist}`} className="flex gap-2 text-[4.2cqw] leading-snug text-ink">
+                <span className="w-[4cqw] shrink-0 font-bold tabular-nums text-ink/75">{i + 1}</span>
                 <span className="min-w-0 truncate font-semibold">{t.track}</span>
               </li>
             ))}
@@ -718,8 +733,8 @@ function SummaryCard({ story, unit }: { story: StoryData; unit: TimeUnit }) {
         </div>
         {story.personality && (
           <div className="col-span-2 min-w-0">
-            <p className="text-[3.4cqw] font-semibold text-white/70">Listening personality</p>
-            <p className="mt-1 text-[4.6cqw] font-bold leading-tight text-white">{story.personality.main.title}</p>
+            <p className="text-[3.4cqw] font-semibold text-ink/75">Listening personality</p>
+            <p className="mt-1 text-[4.6cqw] font-bold leading-tight text-ink">{story.personality.main.title}</p>
           </div>
         )}
       </div>
