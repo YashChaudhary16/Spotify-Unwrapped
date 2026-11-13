@@ -31,6 +31,7 @@ import { unlockStoryAudio } from '@/lib/storyAudio';
 import { StoryPlayer } from './story/StoryPlayer';
 import { StoryHero } from './story/StoryHero';
 import { LeaveOutPanel } from './story/LeaveOutPanel';
+import { ShareSheet } from './story/ShareSheet';
 import { buildStoryCards, prefetchStoryArt } from './story/cards';
 
 interface DashboardProps {
@@ -92,6 +93,12 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
   const { state: storyHidden, options: storyOptions, setArtistHidden, setTrackHidden } = useStoryHidden();
   /** "Leave out of story" panel: which year it lists, and whether it was opened before playing (from the banner). */
   const [leaveOut, setLeaveOut] = useState<{ year: number; beforePlay: boolean } | null>(null);
+  const [shareOpen, setShareOpen] = useState(false);
+  const openShare = useCallback(() => setShareOpen(true), []);
+  // The share sheet belongs to an open story.
+  useEffect(() => {
+    if (storyYear === null) setShareOpen(false);
+  }, [storyYear]);
 
   useEffect(() => {
     const sync = () => {
@@ -150,8 +157,11 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
     [setTrackHidden]
   );
   const storyCards = useMemo(
-    () => (story ? buildStoryCards(story, { unit, hideArtist: hideStoryArtist, hideTrack: hideStoryTrack }) : []),
-    [story, unit, hideStoryArtist, hideStoryTrack]
+    () =>
+      story
+        ? buildStoryCards(story, { unit, hideArtist: hideStoryArtist, hideTrack: hideStoryTrack, onShare: openShare })
+        : [],
+    [story, unit, hideStoryArtist, hideStoryTrack, openShare]
   );
   useEffect(() => {
     if (story) prefetchStoryArt(story);
@@ -459,9 +469,11 @@ export default function Dashboard({ data, onReset, isSample = false, importSumma
           cards={storyCards}
           onClose={closeStory}
           onLeaveOut={() => setLeaveOut({ year: story.year, beforePlay: false })}
-          suspended={leaveOut !== null}
+          suspended={leaveOut !== null || shareOpen}
         />
       )}
+
+      {story && shareOpen && <ShareSheet story={story} unit={unit} onClose={() => setShareOpen(false)} />}
 
       {leaveOut && hideCandidates && (
         <LeaveOutPanel

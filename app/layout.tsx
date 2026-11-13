@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Figtree } from 'next/font/google';
 import { TimeUnitProvider } from '@/components/providers/TimeUnitProvider';
 import { Footer } from '@/components/ui/Footer';
+import { SITE_URL } from '@/lib/site';
 import './globals.css';
 
 const figtree = Figtree({
@@ -10,7 +11,6 @@ const figtree = Figtree({
   display: 'swap',
 });
 
-const SITE_URL = 'https://spotify-unwrapped-nine.vercel.app';
 const TITLE = 'Unwrapped — Your Spotify listening, analyzed';
 const DESCRIPTION =
   'A private, in-browser dashboard for your Spotify extended streaming history: top tracks, albums, artists, habits and streaks. Nothing is uploaded or stored.';

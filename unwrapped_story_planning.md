@@ -31,7 +31,7 @@ This file plans the next big body of work in two parts, built in this order:
 | Ambient / sleep sounds | Same rule as private sessions: counted in totals, never named. Detected automatically by strict phrases (`detectAmbient` in `lib/story.ts`), plus a **"Leave out of story" list** the viewer edits (Step E). User decision 2026-11-12. |
 | Left-out footnote | **No mention** in the story of how much private or ambient listening was left out; the total simply includes it. User decision 2026-11-12. |
 | Audio in story | **Sound on by default** (user decision 2026-11-12). Each song card plays its 30 s Spotify preview, with a speaker button to mute; the choice is remembered in this browser. If the browser blocks sound, the button shows "Tap for sound". |
-| Share image | Rendered on a `<canvas>` in the browser with no new dependency (cover CDN sends CORS `*`, already verified). 9:16 story size and 1:1 square. *(proposed)* |
+| Share image | **Bold poster** (user decision 2026-11-12): a bold color block with a 2×2 grid of the top-4 song covers, listening time, top artist and personality, plus a **small "Unwrapped · spotify-unwrapped-nine.vercel.app" footer**. Drawn on a `<canvas>` in the browser, with no new dependency (both Spotify image CDNs send CORS `*`). 9:16 and 1:1. |
 | Entry point | A "Play your {year} story" button on the Overview tab, plus a year picker; linkable as `#story-2025`. *(proposed)* |
 
 ### Rejected / not doing (don't re-suggest)
@@ -156,12 +156,12 @@ Goal: a complete, short story.
 
 **Done when:** the user is happy with the look on a phone and a laptop.
 
-### Step I — Share image
-- [ ] `lib/shareImage.ts`: draw the summary card on a `<canvas>` (9:16 at 1080×1920, and 1:1 at 1080×1080) with cover art, names, numbers, personality and a small "Unwrapped" mark.
-- [ ] Mobile: the Web Share API with the image file; desktop: download PNG and "Copy image".
-- [ ] Load fonts before drawing (`document.fonts.ready`); truncate long names with "…".
-- [ ] Privacy: the image is generated on the device; nothing is uploaded.
-- [ ] Optional toggles before sharing: hide total time, include personality.
+### Step I — Share image ✅ (2026-11-12; posters checked as PNGs, the share sheet not yet used in a browser)
+- [x] `lib/shareImage.ts`: draw the summary card on a `<canvas>` (9:16 at 1080×1920, and 1:1 at 1080×1080) with cover art, names, numbers, personality and a small "Unwrapped" mark.
+- [x] Mobile: the Web Share API with the image file; desktop: download PNG and "Copy image".
+- [x] Load fonts before drawing (`document.fonts.ready`); truncate long names with "…".
+- [x] Privacy: the image is generated on the device; nothing is uploaded.
+- [x] Optional toggles before sharing: hide total time, include personality.
 
 **Done when:** a PNG is downloaded or shared on desktop and mobile and looks right with long names, missing artwork and every time unit.
 
@@ -275,6 +275,42 @@ Ordered from easiest to hardest. Each one works on the **whole history** (all ye
 **Next**
 - …
 -->
+
+### 2026-11-12 — Step I: share image
+**Decisions (user)**
+- **Layout: bold poster** (not a copy of the summary card).
+- **Site address in the footer:** yes, small.
+
+**Done**
+- `lib/shareImage.ts`, `renderShareImage(story, { format, tone, unit, showTime, showPersonality })`, returns a PNG blob:
+  - **9:16 (1080×1920):** "MY YEAR IN MUSIC", a huge year and "unwrapped.", a centered 2×2 grid of the top-4 covers (420 px each, a rank badge, and the song name on a dark strip), listening time + top artist side by side, personality, and the footer.
+  - **1:1 (1080×1080):** title on one line, a 2×2 grid on the left, and stats stacked on the right.
+  - One big circle in the tone's shape color. The rank badges are ink-colored, so they show on covers and on empty tiles alike.
+  - No cover (sample data or unavailable track) → a tile in the shape color with the song name.
+  - Long names are ellipsized; stats wrap to at most 2–3 lines. Number and unit stay together ("124 days / 6 hrs").
+  - Uses the page's Figtree (the generated `next/font` family, read from `body`) after `document.fonts.load`.
+- `components/story/ShareSheet.tsx`: a dialog with a live preview.
+  - Size (Story 9:16 / Square 1:1), color (electric, hotpink, lime, tangerine, sky, plum), and toggles for listening time and personality.
+  - **Share** (Web Share API with the file, only where `navigator.canShare({ files })`), **Download** (PNG), and **Copy** (Clipboard `ClipboardItem`, where supported).
+  - Status messages, Esc/focus handling, and the note "Made on your device. Nothing is uploaded."
+- **"Share your {year}"** button on the summary card. The story pauses while the sheet is open, and the sheet closes with the story.
+- `lib/site.ts` holds `SITE_URL`/`SITE_HOST`, now shared by `app/layout.tsx` and the poster footer. `lib/useSpotifyArtwork.ts` exports `getSpotifyArtwork()`.
+
+**Checked**
+- The posters were rendered as real PNGs in Node: the same drawing code, with `@napi-rs/canvas` installed in the scratchpad only (not a project dependency), a system font standing in for Figtree, and real Spotify covers.
+- Renders: real 2025 (9:16 electric, 1:1 hotpink in days, 9:16 lime in days) and sample 2024 (9:16 tangerine, no covers, time hidden).
+- Fixes from viewing them: rank badges were invisible on empty tiles; the 9:16 grid was off-center; "124 days 6 / hrs" wrapped badly.
+- `tsc`, `next lint` and `next build` pass.
+
+**Changed files**
+- New: `lib/shareImage.ts`, `lib/site.ts`, `components/story/ShareSheet.tsx`
+- Updated: `components/story/cards.tsx`, `components/Dashboard.tsx`, `lib/useSpotifyArtwork.ts`, `app/layout.tsx`
+
+**Notes / decisions**
+- **Not yet tried in a browser:** Share on a phone, Download and Copy on desktop, and how Figtree's heavier weight fits the layout (the check used a lighter stand-in font).
+
+**Next**
+- Step J: sample-data story.
 
 ### 2026-11-12 — Step H: visual and motion polish, background music
 **Decisions (user)**

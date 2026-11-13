@@ -13,6 +13,7 @@ import {
   Plane,
   Repeat,
   RotateCcw,
+  Share2,
   Shuffle,
   SkipForward,
   Snowflake,
@@ -47,6 +48,8 @@ export interface StoryCardContext {
   /** "Leave out of story" from the ⋯ menus. */
   hideArtist: (artist: string) => void;
   hideTrack: (track: string, artist: string | null) => void;
+  /** Opens the share sheet (button on the summary card). */
+  onShare?: () => void;
 }
 
 /** At most this many cards per story (plan: about 12–14). */
@@ -679,7 +682,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
     audioTrackId: story.topTracks[0]?.trackId,
     label: `Your ${story.year} summary`,
     durationMs: 12000,
-    content: <SummaryCard story={story} unit={unit} />,
+    content: <SummaryCard story={story} unit={unit} onShare={ctx.onShare} />,
   });
 
   // Fit the most striking extras into the card budget, then keep them in narrative order.
@@ -695,7 +698,7 @@ export function buildStoryCards(story: StoryData, ctx: StoryCardContext): StoryC
   return [...core, ...middle, ...tail];
 }
 
-function SummaryCard({ story, unit }: { story: StoryData; unit: TimeUnit }) {
+function SummaryCard({ story, unit, onShare }: { story: StoryData; unit: TimeUnit; onShare?: () => void }) {
   const artist = story.topArtist;
   return (
     <CardFrame dark="green" trackId={artist?.topTrack?.trackId} artist={artist?.name}>
@@ -738,6 +741,16 @@ function SummaryCard({ story, unit }: { story: StoryData; unit: TimeUnit }) {
           </div>
         )}
       </div>
+      {onShare && (
+        <button
+          type="button"
+          onClick={onShare}
+          className="mt-5 inline-flex items-center justify-center gap-2 self-center rounded-full bg-white px-6 py-3 text-[4.2cqw] font-bold text-black shadow-lg shadow-black/30 transition-transform hover:scale-[1.03] active:scale-100"
+        >
+          <Share2 className="h-5 w-5" aria-hidden />
+          Share your {story.year}
+        </button>
+      )}
     </CardFrame>
   );
 }

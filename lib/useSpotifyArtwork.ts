@@ -107,6 +107,11 @@ function loadArtwork(trackId: string): Promise<SpotifyArtwork | null> {
   return promise;
 }
 
+/** A track's cover and color outside React (e.g. for drawing the share image). Null if unavailable. */
+export function getSpotifyArtwork(trackId: string): Promise<SpotifyArtwork | null> {
+  return loadArtwork(trackId);
+}
+
 /** Starts loading a track's cover and color into the cache (e.g. for the next story cards). */
 export function prefetchSpotifyArtwork(trackId: string | null | undefined): void {
   if (trackId) void loadArtwork(trackId);

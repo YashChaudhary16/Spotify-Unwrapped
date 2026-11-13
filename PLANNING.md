@@ -133,6 +133,9 @@ Rules: green marks **data and active state** only, so headings are white. Number
 - …
 -->
 
+### 2026-11-12 — Story Step I (share image)
+- Bold-poster share image drawn on a canvas (9:16 and 1:1, top-4 covers, time, top artist, personality, site footer) with a share sheet (Share / Download / Copy) from the summary card. Details are in `unwrapped_story_planning.md` → Work Log.
+
 ### 2026-11-12 — Story Step H (palette, motion, background music)
 - Hybrid story palette with per-card ink color (`ink` Tailwind color), count-ups and entrance motion, 30 s Spotify previews behind the cards (new `/api/spotify/preview` route, sound on by default with mute). Details are in `unwrapped_story_planning.md` → Work Log.
 
